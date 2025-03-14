@@ -1,16 +1,19 @@
-# filepath: c:\Users\reesh\OneDrive\Desktop\FB_Automation\Video_Trim\TrimFlow\database.py
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from databases import Database
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 from config.config import settings
 
 DATABASE_URL = settings.DATABASE_URL
 
-database = Database(DATABASE_URL)
-metadata = MetaData()
+# Create an async engine
+engine = create_async_engine(DATABASE_URL, echo=True)
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create an async session factory
+SessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
+# Define the base class for models
 Base = declarative_base()
+
+# Dependency to get an async DB session
+async def get_db():
+    async with SessionLocal() as session:
+        yield session

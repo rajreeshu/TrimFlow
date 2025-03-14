@@ -3,11 +3,13 @@ from controllers.video_controller import VideoController
 from services.video_service import VideoService
 from models.video_models import VideoUploadResponse, VideoInfo
 from typing import List
+from sqlalchemy.ext.asyncio import AsyncSession
+from config.database import get_db
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 # Dependency
-def get_video_controller():
+def get_video_controller(db: AsyncSession = Depends(get_db)):
     service = VideoService()
     controller = VideoController(service)
     yield controller
@@ -16,10 +18,11 @@ def get_video_controller():
 @router.post("/upload/", response_model=VideoUploadResponse)
 async def upload_video(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
     controller: VideoController = Depends(get_video_controller)
 ):
     """Upload a video file for processing."""
-    return await controller.upload_video(file)
+    return await controller.upload_video(file,db)
 
 @router.get("/status/{file_id}", response_model=VideoInfo)
 def get_video_status(

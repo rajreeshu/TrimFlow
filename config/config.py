@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     MAX_WORKERS: int = 4
     CHUNK_SIZE: int = 10 * 1024 * 1024  # 10MB
     SEGMENT_TIME: int = 60  # 60 seconds per segment
-    DATABASE_URL: str = "postgresql://user:password@localhost/dbname"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:123@localhost/test"
     
     class Config:
         env_file = ".env"

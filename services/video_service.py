@@ -2,8 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 from fastapi import UploadFile, HTTPException
 import logging
-from typing import Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, List
 from fastapi import Depends
 
 from models.video_models import VideoInfo, ProcessingStatus
@@ -11,22 +10,21 @@ from utils.file_utils import save_file_in_chunks
 from utils.validators import validate_video_file, generate_unique_filename
 from actions.ffmpeg_action import trim_video
 from config.config import settings
-from utils.database_utils import save_original_video, get_db
+from utils.database_utils import save_original_video
 from models.database_models import OriginalVideo
+from services.subtitle_service import find_movie_start_time
+
+import subprocess
 
 logger = logging.getLogger(__name__)
 
 class VideoService:
-    def __init__(self, db: Optional[AsyncSession] = None):
+    def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
         self.video_jobs: Dict[str, VideoInfo] = {}
-        self.db = db
         
-    async def upload_and_process(self, file: UploadFile,  db: AsyncSession = None) -> VideoInfo:
+    async def upload_and_process(self, file: UploadFile) -> VideoInfo:
         """Upload a video file and submit for processing."""
-        db_session = db or self.db
-        if not db_session:
-            raise ValueError("Database session is required")
         try:
             # Validate file
             validate_video_file(file.filename)
@@ -42,12 +40,15 @@ class VideoService:
                 original_path=file_path,
                 status=ProcessingStatus.PENDING
             )
-            
+
             # Save video file
             await save_file_in_chunks(file, file_path)
 
-            # Save to database
+             # Remove metadata from the video file
+            cleaned_file_path = self.remove_metadata(file_path)
+            video_info.original_path = cleaned_file_path
 
+            # Save to database
             original_video = OriginalVideo(
                 video_id=file_id,
                 name=unique_filename,
@@ -61,7 +62,9 @@ class VideoService:
                 addon={}
             )
 
-            await save_original_video(original_video, db_session)
+            await save_original_video(original_video)
+
+            start_time = find_movie_start_time(file.filename)
             
             # Submit for processing
             self.video_jobs[file_id] = video_info
@@ -75,6 +78,31 @@ class VideoService:
             logger.error(f"Error processing upload: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
     
+    def remove_metadata(self, file_path: str) -> str:
+        """Remove all metadata from the video file."""
+        base, ext = os.path.splitext(file_path)
+        cleaned_file_path = f"{base}_cleaned{ext}"
+        command = [
+            "ffmpeg",
+            "-i", file_path,
+            "-map", "0:v",  # Map only the video stream
+            "-map", "0:a",  # Map only the audio stream
+            "-c", "copy",
+            "-map_metadata", "-1",  # Remove all metadata
+            cleaned_file_path
+        ]
+        
+        try:
+            logger.info(f"Removing metadata from {file_path}")
+            subprocess.run(command, check=True)
+            logger.info(f"Metadata removed, saved to {cleaned_file_path}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error removing metadata from {file_path}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to remove metadata: {str(e)}")
+        
+        return cleaned_file_path
+
+
     def _process_video(self, file_id: str) -> None:
         """Process the video in a separate thread."""
         if file_id not in self.video_jobs:

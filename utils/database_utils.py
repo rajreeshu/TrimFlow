@@ -1,6 +1,7 @@
-from models.database_models import OriginalVideo
+from models.database_models import OriginalVideo, TrimmedVideo
 import logging
 from config.database import SessionLocal
+from sqlalchemy.future import select
 from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
@@ -28,5 +29,26 @@ async def save_original_video(video_data: OriginalVideo) -> OriginalVideo:
             return video_data
         except Exception as e:
             logger.error(f"Error saving original video data: {str(e)}")
+            await db.rollback()
+            raise
+
+async def get_original_video(file_id: str) -> OriginalVideo:
+    async with get_session() as db:
+        try:
+            result = await db.execute(select(OriginalVideo).filter(OriginalVideo.video_id == file_id))
+            return result.scalars().first()
+        except Exception as e:
+            logger.error(f"Error retrieving original video data: {str(e)}")
+            raise e
+
+async def save_trimmed_video(trimmed_video: TrimmedVideo) -> TrimmedVideo:
+    async with get_session() as db:
+        try:
+            db.add(trimmed_video)
+            await db.commit()
+            await db.refresh(trimmed_video)
+            return trimmed_video
+        except Exception as e:
+            logger.error(f"Error saving trimmed video data: {str(e)}")
             await db.rollback()
             raise

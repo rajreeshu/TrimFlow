@@ -2,6 +2,9 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 from fastapi import UploadFile, HTTPException
 import logging
+import asyncio
+import subprocess
+from datetime import timedelta
 from typing import Dict, List
 from fastapi import Depends
 
@@ -10,11 +13,9 @@ from utils.file_utils import save_file_in_chunks
 from utils.validators import validate_video_file, generate_unique_filename
 from services.ffmpeg_service import trim_video
 from config.config import settings
-from utils.database_utils import save_original_video
-from models.database_models import OriginalVideo
+from utils.database_utils import save_original_video, save_trimmed_video, get_original_video
+from models.database_models import OriginalVideo, TrimmedVideo
 from services.subtitle_service import find_movie_start_time, get_subtitle_from_video
-
-import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +67,9 @@ class VideoService:
 
             await save_original_video(original_video)
 
-            start_time = find_movie_start_time(file.filename)
-            
             # Submit for processing
             self.video_jobs[file_id] = video_info
-            self.executor.submit(self._process_video, file_id)
+            asyncio.create_task(self._process_video(file_id))
             
             return video_info
             
@@ -105,15 +104,30 @@ class VideoService:
         return cleaned_file_path
 
 
-    def _process_video(self, file_id: str) -> None:
+    async def _process_video(self, file_id: str) -> None:
         """Process the video in a separate thread."""
         if file_id not in self.video_jobs:
             logger.error(f"Video job not found: {file_id}")
             return
             
         video_info = self.video_jobs[file_id]
+        original_video_db_data = await get_original_video(file_id)
         updated_info = trim_video(video_info)
         self.video_jobs[file_id] = updated_info
+        
+        for segment in updated_info.segments:
+            trimmed_video = TrimmedVideo(
+                original_video_id=original_video_db_data.id,
+                start_time=timedelta(seconds=0),
+                end_time=timedelta(seconds=0),
+                remark="",
+                description="",
+                hashtags=[],
+                thumbnail=None,
+                file_name=segment,
+                location=os.path.join(settings.UPLOAD_DIR, segment)
+            )
+            await save_trimmed_video(trimmed_video)
     
     def get_video_status(self, file_id: str) -> VideoInfo:
         """Get the status of a video processing job."""

@@ -8,11 +8,11 @@ from fastapi import Depends
 from models.video_models import VideoInfo, ProcessingStatus
 from utils.file_utils import save_file_in_chunks
 from utils.validators import validate_video_file, generate_unique_filename
-from actions.ffmpeg_action import trim_video
+from services.ffmpeg_service import trim_video
 from config.config import settings
 from utils.database_utils import save_original_video
 from models.database_models import OriginalVideo
-from services.subtitle_service import find_movie_start_time
+from services.subtitle_service import find_movie_start_time, get_subtitle_from_video
 
 import subprocess
 
@@ -43,6 +43,8 @@ class VideoService:
 
             # Save video file
             await save_file_in_chunks(file, file_path)
+
+            movie_start_time = find_movie_start_time(file_path)
 
              # Remove metadata from the video file
             cleaned_file_path = self.remove_metadata(file_path)

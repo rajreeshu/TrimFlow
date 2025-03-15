@@ -1,37 +1,49 @@
-import subliminal
-import pysrt
 import logging
-from babelfish import Language
+import subprocess
+import srt
+import subprocess
 
 logger = logging.getLogger(__name__)
 
-def download_subtitle(movie_name):
-    # Search for subtitles
-    subtitles = subliminal.download_best_subtitles([subliminal.Video(movie_name)], {Language('eng')})
-    
-    # Save subtitles
-    for video, subs in subtitles.items():
-        subliminal.save_subtitles(video, subs)
+
+def get_subtitle_from_video(video_path, track_index=0):
+    try:
+        command = [
+            'ffmpeg',
+            '-i', video_path,
+            '-map', f'0:s:{track_index}',
+            '-f', 'srt',
+            'pipe:1'
+        ]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subtitle_data = result.stdout.decode('utf-8')
+        return subtitle_data
+    except subprocess.CalledProcessError as e:
+        print(f"Error extracting subtitles: {e.stderr.decode('utf-8')}")
+        return None
+
+def find_first_dialogue(subtitle_data):
+    try:
+        subtitles = list(srt.parse(subtitle_data))
+        for subtitle in subtitles:
+            if len(subtitle.content.strip()) > 3:
+                return str(subtitle.start)
+        return None
+    except srt.SRTParseError as e:
+        print(f"Error parsing subtitle data: {e}")
+        return None
 
 
-def find_first_dialogue(srt_path):
-    subs = pysrt.open(srt_path)
-    for sub in subs:
-        if len(sub.text.strip()) > 3:
-            return str(sub.start)
-    return None
-
-
-def find_movie_start_time(movie_name):
-    srt_file = download_subtitle(movie_name)
-    if srt_file:
-        movie_start_time = find_first_dialogue(srt_file)
+def find_movie_start_time(video_path):
+    subtitle_data = get_subtitle_from_video(video_path)
+    if subtitle_data:
+        movie_start_time = find_first_dialogue(subtitle_data)
         if movie_start_time:
-            logging.info(f"Movie starts at: {movie_start_time}")
+            print(f"Movie starts at: {movie_start_time}")
             return movie_start_time
         else:
-            logging.info("Could not determine movie start time.")
+            print("Could not determine movie start time.")
             return None
     else:
-        logging.info("Subtitle not found.")
+        print("No subtitles found.")
         return None

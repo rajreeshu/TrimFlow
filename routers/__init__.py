@@ -1,1 +1,0 @@
-from .video_router import router as video_router

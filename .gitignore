@@ -1,1 +1,2 @@
-git rm -r --cached uploaded_videos/
+# Ignore the example_dir directory
+media/

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, File, UploadFile
 from controllers.video_controller import VideoController
+from models.database_models import OriginalVideo
 from services.video_service import VideoService
 from models.video_models import VideoUploadResponse, VideoInfo
 from typing import List
@@ -35,3 +36,11 @@ def get_all_videos(
 ):
     """Get all video jobs."""
     return controller.get_all_videos()
+
+
+# @router.get("/original_videos", response_model=List[OriginalVideo])
+# async def get_all_original_videos(
+#     controller: VideoController = Depends(get_video_controller)
+# ):
+#     """Get all original video records."""
+#     return await controller.get_all_original_videos()

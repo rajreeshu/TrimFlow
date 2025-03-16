@@ -9,30 +9,36 @@ from typing import Dict, List
 from fastapi import Depends
 
 from models.video_models import VideoInfo, ProcessingStatus
-from utils.file_utils import save_file_in_chunks
-from utils.validators import validate_video_file, generate_unique_filename
-from services.ffmpeg_service import trim_video
-from config.config import settings
-from utils.database_utils import save_original_video, save_trimmed_video, get_original_video
+import utils.file_utils as file_utils
+import utils.validators as validators
+import services.ffmpeg_service as ffmpeg_service
+import config.config as config
+import utils.database_utils as database_utils
 from models.database_models import OriginalVideo, TrimmedVideo
-from services.subtitle_service import find_movie_start_time, get_subtitle_from_video
+import services.subtitle_service as subtitle_service
 
 logger = logging.getLogger(__name__)
 
+
+async def get_all_original_videos() -> List[OriginalVideo]:
+    """Get all original video jobs."""
+    return await database_utils.get_all_original_videos()
+
+
 class VideoService:
     def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=settings.MAX_WORKERS)
+        self.executor = ThreadPoolExecutor(max_workers=config.settings.MAX_WORKERS)
         self.video_jobs: Dict[str, VideoInfo] = {}
         
     async def upload_and_process(self, file: UploadFile) -> VideoInfo:
         """Upload a video file and submit for processing."""
         try:
             # Validate file
-            validate_video_file(file.filename)
+            validators.validate_video_file(file.filename)
             
             # Generate unique filename and ID
-            unique_filename, file_id = generate_unique_filename(file.filename)
-            file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
+            unique_filename, file_id = validators.generate_unique_filename(file.filename)
+            file_path = os.path.join(config.settings.UPLOAD_DIR, unique_filename)
             
             # Create video info object
             video_info = VideoInfo(
@@ -43,9 +49,9 @@ class VideoService:
             )
 
             # Save video file
-            await save_file_in_chunks(file, file_path)
+            await file_utils.save_file_in_chunks(file, file_path)
 
-            movie_start_time = find_movie_start_time(file_path)
+            movie_start_time = subtitle_service.find_movie_start_time(file_path)
 
              # Remove metadata from the video file
             cleaned_file_path = self.remove_metadata(file_path)
@@ -65,7 +71,7 @@ class VideoService:
                 addon={}
             )
 
-            await save_original_video(original_video)
+            await database_utils.save_original_video(original_video)
 
             # Submit for processing
             self.video_jobs[file_id] = video_info
@@ -111,8 +117,8 @@ class VideoService:
             return
             
         video_info = self.video_jobs[file_id]
-        original_video_db_data = await get_original_video(file_id)
-        updated_info = trim_video(video_info)
+        original_video_db_data = await database_utils.get_original_video(file_id)
+        updated_info = ffmpeg_service.trim_video(video_info)
         self.video_jobs[file_id] = updated_info
         
         for segment in updated_info.segments:
@@ -125,9 +131,9 @@ class VideoService:
                 hashtags=[],
                 thumbnail=None,
                 file_name=segment,
-                location=os.path.join(settings.UPLOAD_DIR, segment)
+                location=os.path.join(config.settings.UPLOAD_DIR, segment)
             )
-            await save_trimmed_video(trimmed_video)
+            await database_utils.save_trimmed_video(trimmed_video)
     
     def get_video_status(self, file_id: str) -> VideoInfo:
         """Get the status of a video processing job."""
@@ -138,7 +144,11 @@ class VideoService:
     def get_all_videos(self) -> List[VideoInfo]:
         """Get all video jobs."""
         return list(self.video_jobs.values())
-    
+
+    # async def get_all_original_videos(self) -> List[OriginalVideo]:
+    #     """Get all original video records."""
+    #     return await database_utils.get_all_original_videos()
+
     def shutdown(self):
         """Shutdown the executor properly."""
         self.executor.shutdown(wait=True)

@@ -1,4 +1,6 @@
 from fastapi import HTTPException, UploadFile, File
+
+from models.database_models import OriginalVideo
 from services.video_service import VideoService
 from models.video_models import VideoUploadResponse, VideoInfo
 from typing import List
@@ -25,3 +27,8 @@ class VideoController:
     def get_all_videos(self) -> List[VideoInfo]:
         """Get all video jobs."""
         return self.video_service.get_all_videos()
+
+
+    # async def get_all_original_videos(self) -> List[OriginalVideo]:
+    #     """Get all original video records."""
+    #     return await self.video_service.get_all_original_videos()

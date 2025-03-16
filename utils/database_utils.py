@@ -1,3 +1,5 @@
+from typing import List
+
 from models.database_models import OriginalVideo, TrimmedVideo
 import logging
 from config.database import SessionLocal
@@ -40,6 +42,16 @@ async def get_original_video(file_id: str) -> OriginalVideo:
         except Exception as e:
             logger.error(f"Error retrieving original video data: {str(e)}")
             raise e
+
+# async def get_all_original_videos() -> List[OriginalVideo]:
+#     """Get all original video records."""
+#     async with get_session() as db:
+#         try:
+#             result = await db.execute(select(OriginalVideo))
+#             return result.scalars().all()
+#         except Exception as e:
+#             logger.error(f"Error retrieving original video data: {str(e)}")
+#             raise e
 
 async def save_trimmed_video(trimmed_video: TrimmedVideo) -> TrimmedVideo:
     async with get_session() as db:

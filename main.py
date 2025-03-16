@@ -1,8 +1,7 @@
 import logging
 
 from fastapi import FastAPI
-
-from config.database import engine, Base
+import database.database_config as database_config
 from routers.video_router import VideoRouter
 
 
@@ -34,15 +33,18 @@ class MainApp:
     def initialize_database(self):
         @self.app.on_event("startup")
         async def startup():
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+            async with database_config.engine.begin() as conn:
+                await conn.run_sync(database_config.Base.metadata.create_all)
 
     def run(self):
         import uvicorn
         uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
 # Create an instance of MainApp and expose the app attribute
 service = MainApp()
 app = service.app
+
 # Run the FastAPI server
 if __name__ == "__main__":
     service.run()

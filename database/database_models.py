@@ -1,7 +1,6 @@
-from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, BigInteger, Text, JSON, TIMESTAMP, Interval, ForeignKey, ARRAY, LargeBinary
 from sqlalchemy.sql import func
-from config.database import Base
+from database.database_config import Base
 
 class OriginalVideo(Base):
     __tablename__ = "original_video"

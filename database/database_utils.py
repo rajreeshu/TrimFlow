@@ -1,8 +1,6 @@
-from typing import List
-
-from models.database_models import OriginalVideo, TrimmedVideo
+from database.database_models import OriginalVideo, TrimmedVideo
 import logging
-from config.database import SessionLocal
+import database.database_config as database_config
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
 
@@ -11,7 +9,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def get_session():
     """Context manager for database sessions."""
-    session = SessionLocal()
+    session = database_config.SessionLocal()
     try:
         yield session
         await session.commit()

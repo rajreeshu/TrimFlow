@@ -1,4 +1,7 @@
-from fastapi import HTTPException, UploadFile, File
+from fastapi import UploadFile, File
+
+from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
+from database.database_models import OriginalVideo
 from services.video_service import VideoService
 from models.video_models import VideoUploadResponse, VideoInfo
 from typing import List
@@ -25,3 +28,11 @@ class VideoController:
     def get_all_videos(self) -> List[VideoInfo]:
         """Get all video jobs."""
         return self.video_service.get_all_videos()
+
+    async def get_all_original_videos(self) -> List[OriginalVideoDTO]:
+        """Get all original videos."""
+        return await self.video_service.get_all_original_videos()
+
+    async def get_trimmed_videos_by_original_file_id(self, file_id: str) -> List[TrimmedVideoDTO]:
+        """Get all trimmed videos for a given original file ID."""
+        return await self.video_service.get_trimmed_videos_by_original_file_id(file_id)

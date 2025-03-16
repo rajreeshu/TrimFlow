@@ -1,0 +1,10 @@
+aiofiles==24.1.0
+fastapi==0.115.11
+pydantic==2.10.6
+pydantic_settings==2.8.1
+setuptools==76.0.0
+SQLAlchemy==2.0.39
+srt==3.5.3
+uvicorn==0.34.0
+python-multipart
+asyncpg

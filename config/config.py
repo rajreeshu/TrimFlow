@@ -16,5 +16,5 @@ def ensure_directories_exist(properties: Properties):
     os.makedirs(properties.UPLOAD_DIR, exist_ok=True)
     os.makedirs(properties.TRIMMED_DIR, exist_ok=True)
 
-properties = Properties()
-ensure_directories_exist(properties)
+config_properties = Properties()
+ensure_directories_exist(config_properties)

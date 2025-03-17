@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class VideoService:
     def __init__(self, ffmpeg_service: FfmpegService):
-        self.executor = ThreadPoolExecutor(max_workers=config.properties.MAX_WORKERS)
+        self.executor = ThreadPoolExecutor(max_workers=config.config_properties.MAX_WORKERS)
         self.video_jobs: Dict[str, VideoInfo] = {}
         self.ffmpeg_service = ffmpeg_service
         self.original_video_repo = OriginalVideoRepository()
@@ -37,23 +37,8 @@ class VideoService:
             unique_filename, file_id = validators.generate_unique_filename(file.filename)
 
             # Save video file
-            file_path = os.path.join(config.properties.UPLOAD_DIR, unique_filename)
+            file_path = os.path.join(config.config_properties.UPLOAD_DIR, unique_filename)
             await file_utils.save_file_in_chunks(file, file_path)
-
-            movie_start_time = subtitle_service.find_movie_start_time(file_path)
-
-
-
-            # Remove metadata from the video file
-            cleaned_file_path = self.ffmpeg_service.remove_metadata(file_path)
-
-            # Create video info object
-            video_info = VideoInfo(
-                file_id=file_id,
-                filename=unique_filename,
-                original_path=cleaned_file_path,
-                status=ProcessingStatus.PENDING
-            )
 
             # Save to database
             original_video = OriginalVideo(
@@ -70,6 +55,19 @@ class VideoService:
             )
 
             await self.original_video_repo.save(original_video)
+
+            movie_start_time = subtitle_service.find_movie_start_time(file_path)
+
+            # Remove metadata from the video file
+            cleaned_file_path = self.ffmpeg_service.remove_metadata(file_path)
+
+            # Create video info object
+            video_info = VideoInfo(
+                file_id=file_id,
+                filename=unique_filename,
+                original_path=cleaned_file_path,
+                status=ProcessingStatus.PENDING
+            )
 
             # Submit for processing
             self.video_jobs[file_id] = video_info
@@ -91,7 +89,7 @@ class VideoService:
         video_info = self.video_jobs[file_id]
         original_video_db_data = await self.original_video_repo.get_by_columns({"video_id": file_id})
         original_video_db_data = original_video_db_data[0]
-        updated_info = self.ffmpeg_service.trim_video(video_info)
+        updated_info = await self.ffmpeg_service.trim_video(video_info,skip_pairs=[(300, 600), (1200, 1500)])
         self.video_jobs[file_id] = updated_info
         
         for segment in updated_info.segments:
@@ -104,7 +102,7 @@ class VideoService:
                 hashtags=[],
                 thumbnail=None,
                 file_name=segment,
-                location=os.path.join(config.properties.UPLOAD_DIR, segment)
+                location=os.path.join(config.config_properties.UPLOAD_DIR, segment)
             )
             await self.trimmed_video_repo.save(trimmed_video)
     

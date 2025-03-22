@@ -4,37 +4,64 @@ import logging
 
 from fastapi import HTTPException
 
-from config.config import properties
+from config.config import config_properties
 from models.video_models import ProcessingStatus, VideoInfo
+
+from typing import List
 
 logger = logging.getLogger(__name__)
 
 class FfmpegService:
-    def trim_video(self,video_info: VideoInfo) -> VideoInfo:
+    async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple], segment_time: int, start_time:int, end_time:int) -> VideoInfo:
         """Trim the video into segments using FFmpeg."""
         try:
+            # Get the duration of the video
+            command_duration = [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                video_info.original_path
+            ]
+            duration_result = subprocess.run(command_duration, check=True, capture_output=True, text=True)
+            total_duration = float(duration_result.stdout.strip())
+
+            # Adding in touples to remove the start and End time of the video
+            skip_pairs.append((0, start_time))
+            skip_pairs.append((total_duration-end_time, total_duration))
+
             video_info.status = ProcessingStatus.PROCESSING
 
             base_name = os.path.splitext(os.path.basename(video_info.filename))[0]
-            output_pattern = os.path.join(properties.TRIMMED_DIR, f"{base_name}_{video_info.file_id}_part_%02d.mp4")
+            output_pattern = os.path.join(config_properties.TRIMMED_DIR, f"{base_name}_{video_info.file_id}_part_%02d.mp4")
+
+
+
+
+            # Create the select filter expression
+            select_expr = " + ".join([f"between(t,{start},{end})" for start, end in skip_pairs])
+            select_filter = f"select='not({select_expr})',setpts=N/FRAME_RATE/TB"
 
             # FFmpeg command to split video
             command = [
                 "ffmpeg",
                 "-i", video_info.original_path,
-                "-c", "copy",  # Copy codec to speed up processing
+                "-vf", select_filter,
+                "-af", f"aselect='not({select_expr})',asetpts=N/SR/TB",
+                "-c:v", "libx264",  # Specify video codec
+                "-c:a", "aac",  # Specify audio codec
                 "-map", "0",
-                "-segment_time", str(properties.SEGMENT_TIME),
+                "-segment_time", str(segment_time),
                 "-f", "segment",
                 "-reset_timestamps", "1",
                 output_pattern
             ]
 
             logger.info(f"Starting FFmpeg process for {video_info.filename}")
-            process = subprocess.run(command, check=True, capture_output=True, text=True)
+            subprocess.run(command, check=True, capture_output=True, text=True)
 
             # Get list of created segments
-            segment_files = [f for f in os.listdir(properties.TRIMMED_DIR)
+            segment_files = [f for f in os.listdir(config_properties.TRIMMED_DIR)
                              if f.startswith(f"{base_name}_{video_info.file_id}_part_")]
             video_info.segments = sorted(segment_files)
             video_info.status = ProcessingStatus.COMPLETED

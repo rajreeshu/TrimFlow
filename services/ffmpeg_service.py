@@ -84,22 +84,24 @@ class FfmpegService:
         """Remove all metadata from the video file."""
         base, ext = os.path.splitext(file_path)
         cleaned_file_path = f"{base}_cleaned{ext}"
-        command = [
-            "ffmpeg",
-            "-i", file_path,
-            "-map", "0:v",  # Map only the video stream
-            "-map", "0:a",  # Map only the audio stream
-            "-c", "copy",
-            "-map_metadata", "-1",  # Remove all metadata
-            cleaned_file_path
-        ]
 
         try:
+            # Check if the input file has an audio stream
+            probe_cmd = ['ffprobe', '-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of',
+                         'csv=p=0', file_path]
+            result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            has_audio = bool(result.stdout.strip())
+
+            # Construct the ffmpeg command
+            command = ['ffmpeg', '-i', file_path, '-map', '0:v']
+            if has_audio:
+                command.extend(['-map', '0:a'])
+            command.extend(['-c', 'copy', '-map_metadata', '-1', cleaned_file_path])
+
             logger.info(f"Removing metadata from {file_path}")
             subprocess.run(command, check=True)
             logger.info(f"Metadata removed, saved to {cleaned_file_path}")
         except subprocess.CalledProcessError as e:
             logger.error(f"Error removing metadata from {file_path}: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to remove metadata: {str(e)}")
 
         return cleaned_file_path

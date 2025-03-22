@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form
 from controllers.video_controller import VideoController
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.database_models import OriginalVideo
-from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoScreenType, VideoEditType
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
+
+import utils.video_utils as video_utils
 
 
 def get_video_controller():
@@ -25,16 +27,31 @@ class VideoRouter:
     def add_routes(self):
         @self.router.post("/upload/", response_model=VideoUploadResponse)
         async def upload_video(
-            file: UploadFile = File(...),
-                segment_time: Optional[int] = Form(None),
-                skip_pairs: Optional[str] = Form(None),  # Accept as string
-                screen_type: Optional[str] = Form(None),
-                edit_type: Optional[str] = Form(None),
-                start_time: Optional[int] = Form(None),
-                end_time: Optional[int] = Form(None),
-                controller: VideoController = Depends(get_video_controller)
+            file: Optional[UploadFile] = File(None),
+            video_url: Optional[str] = Form(None),
+            segment_time: Optional[int] = Form(None),
+            skip_pairs: Optional[str] = Form(None),  # Accept as string
+            screen_type: Optional[str] = Form(None),
+            edit_type: Optional[str] = Form(None),
+            start_time: Optional[int] = Form(None),
+            end_time: Optional[int] = Form(None),
+            controller: VideoController = Depends(get_video_controller)
         ):
-            """Upload a video file for processing."""
+            if file is None and video_url is None:
+                raise HTTPException(status_code=400, detail="Either file or video_url must be provided")
+
+            if video_url is not None:
+                file = video_utils.download_online_video(video_url)
+                if file is None:
+                    raise HTTPException(status_code=400, detail="No video found in the URL")
+
+            # Set default values if not provided
+            segment_time = segment_time or 55  # Default segment time
+            screen_type = screen_type or VideoScreenType.PORTRAIT
+            edit_type = edit_type or VideoEditType.STATIC_COLOR
+            start_time = start_time or 0
+            end_time = end_time or 0
+
             # Parse skip_pairs from string to list of tuples if provided
             parsed_skip_pairs = None
             if skip_pairs:
@@ -45,6 +62,9 @@ class VideoRouter:
                     parsed_skip_pairs = [tuple(pair) for pair in parsed_list]
                 except:
                     raise HTTPException(status_code=400, detail="Invalid format for skip_pairs")
+
+            if parsed_skip_pairs is None:
+                parsed_skip_pairs = []
 
             # Create VideoProcessInfo object
             video_process_info = VideoProcessInfo(

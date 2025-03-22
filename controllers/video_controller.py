@@ -3,16 +3,16 @@ from fastapi import UploadFile, File
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.database_models import OriginalVideo
 from services.video_service import VideoService
-from models.video_models import VideoUploadResponse, VideoInfo
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
 from typing import List
 
 class VideoController:
     def __init__(self, video_service: VideoService):
         self.video_service = video_service
     
-    async def upload_video(self, file: UploadFile = File(...)) -> VideoUploadResponse:
+    async def upload_video(self, video_process_info: VideoProcessInfo, file: UploadFile = File(...)) -> VideoUploadResponse:
         """Handle video upload request."""
-        video_info = await self.video_service.upload_and_process(file)
+        video_info = await self.video_service.upload_and_process(file, video_process_info)
         
         return VideoUploadResponse(
             filename=video_info.filename,

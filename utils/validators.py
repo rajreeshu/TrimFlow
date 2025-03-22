@@ -1,3 +1,5 @@
+import re
+
 from fastapi import HTTPException
 import os
 import uuid
@@ -20,4 +22,5 @@ def generate_unique_filename(filename: str) -> Tuple[str, str]:
     extension = os.path.splitext(filename)[1]
     file_id = str(uuid.uuid4())
     unique_filename = f"{base_name}_{file_id}{extension}"
+    unique_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', unique_filename)
     return unique_filename, file_id

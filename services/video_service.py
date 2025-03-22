@@ -9,25 +9,25 @@ from typing import Dict, List
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.repository.original_video_repository import OriginalVideoRepository
 from database.repository.trimmed_video_repository import TrimmedVideoRepository
-from models.video_models import VideoInfo, ProcessingStatus
+from models.video_models import VideoInfo, ProcessingStatus, VideoProcessInfo
 import utils.file_utils as file_utils
 import utils.validators as validators
-import config.config as config
 from database.database_models import OriginalVideo, TrimmedVideo
 import services.subtitle_service as subtitle_service
 from services.ffmpeg_service import FfmpegService
+from config.config import config_properties
 
 logger = logging.getLogger(__name__)
 
 class VideoService:
     def __init__(self, ffmpeg_service: FfmpegService):
-        self.executor = ThreadPoolExecutor(max_workers=config.config_properties.MAX_WORKERS)
+        self.executor = ThreadPoolExecutor(max_workers=config_properties.MAX_WORKERS)
         self.video_jobs: Dict[str, VideoInfo] = {}
         self.ffmpeg_service = ffmpeg_service
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
 
-    async def upload_and_process(self, file: UploadFile) -> VideoInfo:
+    async def upload_and_process(self, file: UploadFile, video_process_info: VideoProcessInfo) -> VideoInfo:
         """Upload a video file and submit for processing."""
         try:
             # Validate file
@@ -37,7 +37,7 @@ class VideoService:
             unique_filename, file_id = validators.generate_unique_filename(file.filename)
 
             # Save video file
-            file_path = os.path.join(config.config_properties.UPLOAD_DIR, unique_filename)
+            file_path = os.path.join(config_properties.UPLOAD_DIR, unique_filename)
             await file_utils.save_file_in_chunks(file, file_path)
 
             # Save to database
@@ -55,8 +55,8 @@ class VideoService:
             )
 
             await self.original_video_repo.save(original_video)
-
-            movie_start_time = subtitle_service.find_movie_start_time(file_path)
+            if video_process_info.start_time is None:
+                video_process_info.start_time = subtitle_service.find_movie_start_time(file_path)
 
             # Remove metadata from the video file
             cleaned_file_path = self.ffmpeg_service.remove_metadata(file_path)
@@ -71,7 +71,7 @@ class VideoService:
 
             # Submit for processing
             self.video_jobs[file_id] = video_info
-            asyncio.create_task(self._process_video(file_id))
+            asyncio.create_task(self._process_video(file_id,video_process_info))
             
             return video_info
 
@@ -80,7 +80,7 @@ class VideoService:
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
-    async def _process_video(self, file_id: str) -> None:
+    async def _process_video(self, file_id: str, video_process_info:VideoProcessInfo) -> None:
         """Process the video in a separate thread."""
         if file_id not in self.video_jobs:
             logger.error(f"Video job not found: {file_id}")
@@ -89,7 +89,7 @@ class VideoService:
         video_info = self.video_jobs[file_id]
         original_video_db_data = await self.original_video_repo.get_by_columns({"video_id": file_id})
         original_video_db_data = original_video_db_data[0]
-        updated_info = await self.ffmpeg_service.trim_video(video_info,skip_pairs=[(300, 600), (1200, 1500)])
+        updated_info = await self.ffmpeg_service.trim_video(video_info,skip_pairs=video_process_info.skip_pairs, segment_time=video_process_info.segment_time, start_time=video_process_info.start_time, end_time=video_process_info.end_time)
         self.video_jobs[file_id] = updated_info
         
         for segment in updated_info.segments:
@@ -102,7 +102,7 @@ class VideoService:
                 hashtags=[],
                 thumbnail=None,
                 file_name=segment,
-                location=os.path.join(config.config_properties.UPLOAD_DIR, segment)
+                location=os.path.join(config_properties.TRIMMED_DIR, segment)
             )
             await self.trimmed_video_repo.save(trimmed_video)
     
@@ -124,7 +124,7 @@ class VideoService:
         """Retrieve all records from the OriginalVideo table."""
         try:
             original_videos = await self.original_video_repo.get_all()
-            return [OriginalVideoDTO(**video.__dict__) for video in original_videos]
+            return [OriginalVideoDTO(**{**video.__dict__, "location": config_properties.COMPLETE_BASE_URL+"/"+video.location}) for video in original_videos]
         except Exception as e:
             logger.error(f"Error retrieving original videos: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve original videos: {str(e)}")
@@ -136,7 +136,7 @@ class VideoService:
             original_video_db_data = original_video_db_data[0]
             trimmed_videos = await self.trimmed_video_repo.get_by_columns({"original_video_id": original_video_db_data.id})
 
-            return [TrimmedVideoDTO(**video.__dict__) for video in trimmed_videos]
+            return [TrimmedVideoDTO(**{**video.__dict__, "location": config_properties.COMPLETE_BASE_URL+"/"+video.location}) for video in trimmed_videos]
         except Exception as e:
             logger.error(f"Error retrieving trimmed videos for original file ID {file_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve trimmed videos: {str(e)}")

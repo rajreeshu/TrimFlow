@@ -6,8 +6,12 @@ class Properties(BaseSettings):
     TRIMMED_DIR: str
     MAX_WORKERS: int
     CHUNK_SIZE: int
-    SEGMENT_TIME: int
     DATABASE_URL: str
+    PORT : str
+    PROTOCOL : str
+    BASE_URL : str
+    COMPLETE_BASE_URL: str
+
     
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), '..', 'environment', f".env.{os.getenv('ENV', 'dev')}")

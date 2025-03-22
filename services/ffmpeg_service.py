@@ -12,14 +12,9 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 class FfmpegService:
-    async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple]) -> VideoInfo:
+    async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple], segment_time: int, start_time:int, end_time:int) -> VideoInfo:
         """Trim the video into segments using FFmpeg."""
         try:
-            video_info.status = ProcessingStatus.PROCESSING
-
-            base_name = os.path.splitext(os.path.basename(video_info.filename))[0]
-            output_pattern = os.path.join(config_properties.TRIMMED_DIR, f"{base_name}_{video_info.file_id}_part_%02d.mp4")
-
             # Get the duration of the video
             command_duration = [
                 "ffprobe",
@@ -30,6 +25,18 @@ class FfmpegService:
             ]
             duration_result = subprocess.run(command_duration, check=True, capture_output=True, text=True)
             total_duration = float(duration_result.stdout.strip())
+
+            # Adding in touples to remove the start and End time of the video
+            skip_pairs.append((0, start_time))
+            skip_pairs.append((total_duration-end_time, total_duration))
+
+            video_info.status = ProcessingStatus.PROCESSING
+
+            base_name = os.path.splitext(os.path.basename(video_info.filename))[0]
+            output_pattern = os.path.join(config_properties.TRIMMED_DIR, f"{base_name}_{video_info.file_id}_part_%02d.mp4")
+
+
+
 
             # Create the select filter expression
             select_expr = " + ".join([f"between(t,{start},{end})" for start, end in skip_pairs])
@@ -44,7 +51,7 @@ class FfmpegService:
                 "-c:v", "libx264",  # Specify video codec
                 "-c:a", "aac",  # Specify audio codec
                 "-map", "0",
-                "-segment_time", str(config_properties.SEGMENT_TIME),
+                "-segment_time", str(segment_time),
                 "-f", "segment",
                 "-reset_timestamps", "1",
                 output_pattern

@@ -41,7 +41,7 @@ class BaseRepository:
         """Retrieve all instances of the model."""
         async with self.get_session() as db:
             try:
-                result = await db.execute(select(self.model))
+                result = await db.execute(select(self.model).order_by(self.model.id.desc()))
                 return result.scalars().all()
             except Exception as e:
                 logger.error(f"Error retrieving all {self.model.__name__} data: {str(e)}")

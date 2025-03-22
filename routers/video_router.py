@@ -1,11 +1,11 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form
 
 from controllers.video_controller import VideoController
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.database_models import OriginalVideo
-from models.video_models import VideoUploadResponse, VideoInfo
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
 
@@ -26,10 +26,37 @@ class VideoRouter:
         @self.router.post("/upload/", response_model=VideoUploadResponse)
         async def upload_video(
             file: UploadFile = File(...),
-            controller: VideoController = Depends(get_video_controller)
+                segment_time: Optional[int] = Form(None),
+                skip_pairs: Optional[str] = Form(None),  # Accept as string
+                screen_type: Optional[str] = Form(None),
+                edit_type: Optional[str] = Form(None),
+                start_time: Optional[int] = Form(None),
+                end_time: Optional[int] = Form(None),
+                controller: VideoController = Depends(get_video_controller)
         ):
             """Upload a video file for processing."""
-            return await controller.upload_video(file)
+            # Parse skip_pairs from string to list of tuples if provided
+            parsed_skip_pairs = None
+            if skip_pairs:
+                try:
+                    # Parse string like "[[10,20],[35,40]]" to actual list of tuples
+                    import ast
+                    parsed_list = ast.literal_eval(skip_pairs)
+                    parsed_skip_pairs = [tuple(pair) for pair in parsed_list]
+                except:
+                    raise HTTPException(status_code=400, detail="Invalid format for skip_pairs")
+
+            # Create VideoProcessInfo object
+            video_process_info = VideoProcessInfo(
+                segment_time=segment_time,
+                skip_pairs=parsed_skip_pairs,
+                screen_type=screen_type,
+                edit_type=edit_type,
+                start_time=start_time,
+                end_time=end_time
+            )
+            """Upload a video file for processing."""
+            return await controller.upload_video(video_process_info,file)
 
         @self.router.get("/status/{file_id}", response_model=VideoInfo)
         def get_video_status(

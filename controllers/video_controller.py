@@ -14,8 +14,6 @@ class VideoController:
 
         # Set default values if not provided
         video_process_info.segment_time = video_process_info.segment_time or 55  # Default segment time
-        video_process_info.screen_type = video_process_info.screen_type or VideoScreenType.PORTRAIT
-        video_process_info.edit_type = video_process_info.edit_type or VideoEditType.STATIC_COLOR
         video_process_info.start_time = video_process_info.start_time or 0
         video_process_info.end_time = video_process_info.end_time or 0
 

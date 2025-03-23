@@ -11,6 +11,8 @@ class Properties(BaseSettings):
     PROTOCOL : str
     BASE_URL : str
     COMPLETE_BASE_URL: str
+    WIDTH_720P: int
+    HEIGHT_720P: int
 
     
     class Config:

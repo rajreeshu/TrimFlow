@@ -89,7 +89,7 @@ class VideoService:
         video_info = self.video_jobs[file_id]
         original_video_db_data = await self.original_video_repo.get_by_columns({"video_id": file_id})
         original_video_db_data = original_video_db_data[0]
-        updated_info = await self.ffmpeg_service.trim_video(video_info,skip_pairs=video_process_info.skip_pairs, segment_time=video_process_info.segment_time, start_time=video_process_info.start_time, end_time=video_process_info.end_time)
+        updated_info = await self.ffmpeg_service.trim_video(video_info,video_process_info)
         self.video_jobs[file_id] = updated_info
         
         for segment in updated_info.segments:

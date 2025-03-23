@@ -5,14 +5,21 @@ import logging
 from fastapi import HTTPException
 
 from config.config import config_properties
-from models.video_models import ProcessingStatus, VideoInfo
+from models.video_models import ProcessingStatus, VideoInfo, VideoProcessInfo, VideoScreenType
 
 from typing import List
 
 logger = logging.getLogger(__name__)
 
 class FfmpegService:
-    async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple], segment_time: int, start_time:int, end_time:int) -> VideoInfo:
+    # async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple], segment_time: int, start_time:int, end_time:int) -> VideoInfo:
+    async def trim_video(self,video_info: VideoInfo,  video_process_info:VideoProcessInfo) -> VideoInfo:
+        skip_pairs: List[tuple] = video_process_info.skip_pairs
+        segment_time: int = video_process_info.segment_time
+        start_time: int = video_process_info.start_time
+        end_time: int = video_process_info.end_time
+        orientation: VideoScreenType = video_process_info.screen_type
+
         """Trim the video into segments using FFmpeg."""
         try:
             # Get the duration of the video
@@ -35,18 +42,55 @@ class FfmpegService:
             base_name = os.path.splitext(os.path.basename(video_info.filename))[0]
             output_pattern = os.path.join(config_properties.TRIMMED_DIR, f"{base_name}_{video_info.file_id}_part_%02d.mp4")
 
+            scale_filter = ""
+            pad_filter = ""
+            if orientation is not None:
+                # Get video dimensions
+                command_dimensions = [
+                    "ffprobe",
+                    "-v", "error",
+                    "-select_streams", "v:0",
+                    "-show_entries", "stream=width,height",
+                    "-of", "csv=s=x:p=0",
+                    video_info.original_path
+                ]
+                dimensions_result = subprocess.run(command_dimensions, check=True, capture_output=True, text=True)
+                width, height = map(int, dimensions_result.stdout.strip().split('x'))
 
+                target_width = None
+                target_height = None
+                # Determine if rotation is needed
+                if orientation == VideoScreenType.PORTRAIT and height < width:
+                    target_width, target_height = config_properties.HEIGHT_720P, config_properties.WIDTH_720P
+                elif orientation == VideoScreenType.LANDSCAPE and width < height:
+                    target_width, target_height = config_properties.WIDTH_720P, config_properties.HEIGHT_720P
 
+                if target_width is not None and target_height is not None:
+                    # Create scale and pad filters
+                    scale_filter = f"scale={target_width}:{target_height}:force_original_aspect_ratio=decrease"
+                    pad_filter = f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2"
+                else:
+                    scale_filter = ""
+                    pad_filter = ""
 
             # Create the select filter expression
             select_expr = " + ".join([f"between(t,{start},{end})" for start, end in skip_pairs])
+
             select_filter = f"select='not({select_expr})',setpts=N/FRAME_RATE/TB"
+            filters = [select_filter]
+            if scale_filter:
+                filters.append(scale_filter)
+            if pad_filter:
+                filters.append(pad_filter)
+
+            # Join the filters with commas
+            filter_chain = ",".join(filters)
 
             # FFmpeg command to split video
             command = [
                 "ffmpeg",
                 "-i", video_info.original_path,
-                "-vf", select_filter,
+                 "-vf", filter_chain,
                 "-af", f"aselect='not({select_expr})',asetpts=N/SR/TB",
                 "-c:v", "libx264",  # Specify video codec
                 "-c:a", "aac",  # Specify audio codec

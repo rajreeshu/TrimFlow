@@ -36,7 +36,7 @@ class VideoEditType(Enum):
 class VideoProcessInfo(BaseModel):
     segment_time: Optional[int] = None
     skip_pairs: Optional[List[Tuple[int, int]]] = None
-    screen_type: Optional[str] = None
+    screen_type: Optional[VideoScreenType] = None
     edit_type: Optional[str] = None
     start_time: Optional[int] = None
     end_time: Optional[int] = None

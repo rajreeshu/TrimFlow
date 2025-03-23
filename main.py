@@ -5,6 +5,7 @@ from starlette.staticfiles import StaticFiles
 
 import database.database_config as database_config
 from config.config import config_properties
+from routers.url_router import UrlRouter
 from routers.video_router import VideoRouter
 
 
@@ -30,7 +31,9 @@ class MainApp:
     # Include routers
     def include_routers(self):
         video_router = VideoRouter()
+        url_router = UrlRouter()
         self.app.include_router(video_router.router)
+        self.app.include_router(url_router.router)
 
     # Initialize database
     def initialize_database(self):

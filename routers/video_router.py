@@ -8,6 +8,7 @@ from database.database_models import OriginalVideo
 from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoScreenType, VideoEditType
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
+import utils.validators as validators
 
 import utils.video_utils as video_utils
 
@@ -28,7 +29,6 @@ class VideoRouter:
         @self.router.post("/upload/", response_model=VideoUploadResponse)
         async def upload_video(
             file: Optional[UploadFile] = File(None),
-            video_url: Optional[str] = Form(None),
             segment_time: Optional[int] = Form(None),
             skip_pairs: Optional[str] = Form(None),  # Accept as string
             screen_type: Optional[str] = Form(None),
@@ -37,34 +37,11 @@ class VideoRouter:
             end_time: Optional[int] = Form(None),
             controller: VideoController = Depends(get_video_controller)
         ):
-            if file is None and video_url is None:
-                raise HTTPException(status_code=400, detail="Either file or video_url must be provided")
+            if file is None:
+                raise HTTPException(status_code=400, detail="File must be provided")
 
-            if video_url is not None:
-                file = video_utils.download_online_video(video_url)
-                if file is None:
-                    raise HTTPException(status_code=400, detail="No video found in the URL")
-
-            # Set default values if not provided
-            segment_time = segment_time or 55  # Default segment time
-            screen_type = screen_type or VideoScreenType.PORTRAIT
-            edit_type = edit_type or VideoEditType.STATIC_COLOR
-            start_time = start_time or 0
-            end_time = end_time or 0
-
-            # Parse skip_pairs from string to list of tuples if provided
-            parsed_skip_pairs = None
-            if skip_pairs:
-                try:
-                    # Parse string like "[[10,20],[35,40]]" to actual list of tuples
-                    import ast
-                    parsed_list = ast.literal_eval(skip_pairs)
-                    parsed_skip_pairs = [tuple(pair) for pair in parsed_list]
-                except:
-                    raise HTTPException(status_code=400, detail="Invalid format for skip_pairs")
-
-            if parsed_skip_pairs is None:
-                parsed_skip_pairs = []
+            # Parse skip_pairs string to list of tuples
+            parsed_skip_pairs = validators.parse_tuple_string(skip_pairs)
 
             # Create VideoProcessInfo object
             video_process_info = VideoProcessInfo(

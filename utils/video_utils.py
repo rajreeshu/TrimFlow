@@ -78,10 +78,43 @@ def download_video_from_twitter(url: str) -> File:
 
     return open(file_path, 'rb')
 
+
+def download_online_video_from_direct_url(url: str) -> UploadFile:
+    response = requests.get(url)
+    if response.status_code == 200:
+        file_extension = os.path.splitext(url)[1]
+        file_path = 'downloaded_video' + file_extension
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+
+        # Read the file content into memory
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        # Create a SpooledTemporaryFile for the UploadFile
+        spooled_file = io.BytesIO(file_content)
+
+        # Create an UploadFile object
+        upload_file = UploadFile(
+            filename=os.path.basename(file_path),
+            file=spooled_file,
+        )
+
+        # Clean up the temporary file
+        try:
+            os.remove(file_path)
+        except:
+            pass
+
+        return upload_file
+    else:
+        raise HTTPException(status_code=400, detail="Failed to download video")
+
 def download_online_video(url: str) -> File:
     youtube_pattern = re.compile(r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/.+')
     instagram_pattern = re.compile(r'(https?://)?(www\.)?instagram\.com/.+')
     twitter_pattern = re.compile(r'(https?://)?(www\.)?(twitter|x)\.com/.+')
+    direct_video_pattern = re.compile(r'.*\.(mp4|avi|mov|mkv|webm)$')
 
     if youtube_pattern.match(url):
         return download_youtube_video_with_ytdlp(url)
@@ -89,5 +122,7 @@ def download_online_video(url: str) -> File:
         return download_video_from_instagram(url)
     elif twitter_pattern.match(url):
         return download_video_from_twitter(url)
+    elif direct_video_pattern.match(url):
+        return download_online_video_from_direct_url(url)
     else:
         raise ValueError("Unsupported URL")

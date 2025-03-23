@@ -1,9 +1,11 @@
+import ast
 import re
 
 from fastapi import HTTPException
 import os
 import uuid
-from typing import Tuple
+from typing import Tuple, Any
+
 
 def validate_video_file(filename: str) -> None:
     """Validate if file is a video based on extension."""
@@ -24,3 +26,16 @@ def generate_unique_filename(filename: str) -> Tuple[str, str]:
     unique_filename = f"{base_name}_{file_id}{extension}"
     unique_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', unique_filename)
     return unique_filename, file_id
+
+def parse_tuple_string(tuple_string: str) -> list[tuple[int,int]]:
+    parsed_skip_pairs = None
+    if tuple_string:
+        try:
+            # Parse string like "[[10,20],[35,40]]" to actual list of tuples
+            parsed_list = ast.literal_eval(tuple_string)
+            parsed_skip_pairs = [tuple(pair) for pair in parsed_list]
+        except (ValueError, SyntaxError):
+            raise HTTPException(status_code=400, detail="Invalid format for skip_pairs")
+    if parsed_skip_pairs is None:
+        parsed_skip_pairs = []
+    return parsed_skip_pairs

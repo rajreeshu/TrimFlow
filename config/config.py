@@ -13,6 +13,7 @@ class Properties(BaseSettings):
     COMPLETE_BASE_URL: str
     WIDTH_720P: int
     HEIGHT_720P: int
+    TELEGRAM_BOT_TOKEN: str
 
     
     class Config:

@@ -5,7 +5,7 @@ from fastapi import HTTPException
 import os
 import uuid
 from typing import Tuple, Any
-
+from config.config import config_properties
 
 def validate_video_file(filename: str) -> None:
     """Validate if file is a video based on extension."""
@@ -39,3 +39,6 @@ def parse_tuple_string(tuple_string: str) -> list[tuple[int,int]]:
     if parsed_skip_pairs is None:
         parsed_skip_pairs = []
     return parsed_skip_pairs
+
+def generate_full_path_from_location(location: str) -> str:
+    return config_properties.COMPLETE_BASE_URL + "/" +location

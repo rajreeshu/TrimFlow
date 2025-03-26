@@ -5,7 +5,7 @@ import logging
 import asyncio
 from datetime import timedelta
 from typing import Dict, List
-
+from telegram import Update
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.repository.original_video_repository import OriginalVideoRepository
 from database.repository.trimmed_video_repository import TrimmedVideoRepository
@@ -20,12 +20,13 @@ from config.config import config_properties
 logger = logging.getLogger(__name__)
 
 class VideoService:
-    def __init__(self, ffmpeg_service: FfmpegService):
+    def __init__(self, ffmpeg_service: FfmpegService, update: Update):
         self.executor = ThreadPoolExecutor(max_workers=config_properties.MAX_WORKERS)
         self.video_jobs: Dict[str, VideoInfo] = {}
         self.ffmpeg_service = ffmpeg_service
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
+        self.update = update
 
     async def upload_and_process(self, file: UploadFile, video_process_info: VideoProcessInfo) -> VideoInfo:
         """Upload a video file and submit for processing."""
@@ -105,6 +106,11 @@ class VideoService:
                 location=os.path.join(config_properties.TRIMMED_DIR, segment)
             )
             await self.trimmed_video_repo.save(trimmed_video)
+            if self.update is not None:
+                await self.update.callback_query.message.reply_text(
+                    text=f"[Click to open]({validators.generate_full_path_from_location(os.path.join(config_properties.TRIMMED_DIR, segment))})",
+                    parse_mode='Markdown'
+                )
     
     def get_video_status(self, file_id: str) -> VideoInfo:
         """Get the status of a video processing job."""
@@ -136,7 +142,7 @@ class VideoService:
             original_video_db_data = original_video_db_data[0]
             trimmed_videos = await self.trimmed_video_repo.get_by_columns({"original_video_id": original_video_db_data.id})
 
-            return [TrimmedVideoDTO(**{**video.__dict__, "location": config_properties.COMPLETE_BASE_URL+"/"+video.location}) for video in trimmed_videos]
+            return [TrimmedVideoDTO(**{**video.__dict__, "location":validators.generate_full_path_from_location(video.location) }) for video in trimmed_videos]
         except Exception as e:
             logger.error(f"Error retrieving trimmed videos for original file ID {file_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve trimmed videos: {str(e)}")

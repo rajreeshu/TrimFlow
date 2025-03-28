@@ -1,17 +1,23 @@
-from fastapi import  HTTPException
+from fastapi import HTTPException
+from telegram import Update
+from telegram.ext import CallbackContext
 
 from controllers.video_controller import VideoController
+from controllers.video_controller_interface import UploadControllerInterface
+from models.file_type_model import FileData
 from models.video_models import VideoProcessInfo
-from services.ffmpeg_service import FfmpegService
-from services.video_service import VideoService
-from utils import video_utils, validators
-from telegram import Update
+from utils import video_utils
 
-class UrlController:
-    def __init__(self, update: Update):
-        self.video_controller = VideoController(VideoService(FfmpegService(), update))
 
-    async def upload_from_url(self, video_process_info: VideoProcessInfo, video_url: str, ):
+class UrlController(UploadControllerInterface):
+    def __init__(self, update: Update, context: CallbackContext):
+        super().__init__(update, context)
+        self.video_controller = VideoController(update, context)
+
+    async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData):
+        if not file_data:
+            raise HTTPException(status_code=400, detail="File data is required")
+        video_url = file_data.url
         file = None
         if video_url is not None:
             file = video_utils.download_online_video(video_url)
@@ -19,4 +25,4 @@ class UrlController:
                 raise HTTPException(status_code=400, detail="No video found in the URL")
 
         """Upload a video file for processing."""
-        return await self.video_controller.upload_video(video_process_info, file)
+        return await self.video_controller.upload(video_process_info, FileData.generate(file))

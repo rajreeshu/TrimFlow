@@ -14,10 +14,8 @@ import utils.video_utils as video_utils
 
 
 def get_video_controller():
-    service = VideoService(FfmpegService())
-    controller = VideoController(service)
+    controller = VideoController(None)
     yield controller
-    service.shutdown()
 
 
 class VideoRouter:
@@ -53,7 +51,7 @@ class VideoRouter:
                 end_time=end_time
             )
             """Upload a video file for processing."""
-            return await controller.upload_video(video_process_info,file)
+            return await controller.upload(video_process_info, file)
 
         @self.router.get("/status/{file_id}", response_model=VideoInfo)
         def get_video_status(

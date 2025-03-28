@@ -1,9 +1,11 @@
+from argparse import FileType
 from typing import Optional
 
 from fastapi import APIRouter, Form, Depends, HTTPException
 
 from controllers.url_controller import UrlController
 from controllers.video_controller import VideoController
+from models.file_type_model import FileData
 from models.video_models import VideoUploadResponse, VideoProcessInfo
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
@@ -44,5 +46,9 @@ class UrlRouter:
                 start_time=start_time,
                 end_time=end_time
             )
+
+            file_type : FileData = FileData(url=video_url)
+
+
             """Upload a video file for processing."""
-            return await controller.upload_from_url(video_process_info, video_url)
+            return await controller.upload(video_process_info, file_type)

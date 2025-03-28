@@ -23,8 +23,8 @@ def generate_unique_filename(filename: str) -> Tuple[str, str]:
     base_name = os.path.splitext(filename)[0]
     extension = os.path.splitext(filename)[1]
     file_id = str(uuid.uuid4())
-    unique_filename = f"{base_name}_{file_id}{extension}"
-    unique_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', unique_filename)
+    unique_filename = f"{base_name}-{file_id}{extension}"
+    unique_filename = re.sub(r'[^a-zA-Z0-9.-]', '-', unique_filename)
     return unique_filename, file_id
 
 def parse_tuple_string(tuple_string: str) -> list[tuple[int,int]]:

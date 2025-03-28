@@ -1,17 +1,23 @@
-from fastapi import UploadFile, File
+from typing import List, Optional
 
+from telegram import Update
+
+from controllers.video_controller_interface import UploadControllerInterface
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
-from database.database_models import OriginalVideo
+from models.file_type_model import FileData
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
+from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
-from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoScreenType, VideoEditType
-from typing import List
+from telegram.ext import CallbackContext
 
-class VideoController:
-    def __init__(self, video_service: VideoService):
-        self.video_service = video_service
+
+class VideoController(UploadControllerInterface):
+    def __init__(self, update: Update, context: CallbackContext):
+        super().__init__(update, context)
+        self.video_service = VideoService(FfmpegService(), update, context)
     
-    async def upload_video(self, video_process_info: VideoProcessInfo, file: UploadFile = File(...)) -> VideoUploadResponse:
-
+    async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData) -> VideoUploadResponse:
+        file = file_data.file
         # Set default values if not provided
         video_process_info.segment_time = video_process_info.segment_time or 55  # Default segment time
         video_process_info.start_time = video_process_info.start_time or 0

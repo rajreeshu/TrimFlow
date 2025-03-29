@@ -11,12 +11,13 @@ from telegram.ext import CallbackContext
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.repository.original_video_repository import OriginalVideoRepository
 from database.repository.trimmed_video_repository import TrimmedVideoRepository
-from models.video_models import VideoInfo, ProcessingStatus, VideoProcessInfo
+from models.video_models import VideoInfo, ProcessingStatus, VideoProcessInfo, VideoJobInfo
 import utils.file_utils as file_utils
 import utils.validators as validators
 from database.database_models import OriginalVideo, TrimmedVideo
 import services.subtitle_service as subtitle_service
 from services.ffmpeg_service import FfmpegService
+from services.queue_service import enqueue_video_processing, get_job_status
 from config.config import config_properties
 import urllib.parse
 
@@ -27,13 +28,14 @@ logger = logging.getLogger(__name__)
 class VideoService:
     def __init__(self, ffmpeg_service: FfmpegService, update: Update, context: CallbackContext):
         self.executor = ThreadPoolExecutor(max_workers=config_properties.MAX_WORKERS)
-        self.video_jobs: Dict[str, VideoInfo] = {}
+        self.video_jobs: Dict[str, VideoJobInfo] = {}
         self.ffmpeg_service = ffmpeg_service
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
         self.telegram_messenger = TelegramMessenger(update, context)
+        self.chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') else None
 
-    async def upload_and_process(self, file: UploadFile, video_process_info: VideoProcessInfo) -> VideoInfo:
+    async def upload_and_process(self, file: UploadFile, video_process_info: VideoProcessInfo) -> VideoJobInfo:
         """Upload a video file and submit for processing."""
         try:
             # Validate file
@@ -75,54 +77,56 @@ class VideoService:
                 status=ProcessingStatus.PENDING
             )
 
-            # Submit for processing
-            self.video_jobs[file_id] = video_info
-            asyncio.create_task(self._process_video(file_id,video_process_info))
+            # Enqueue the job
+            job_id = enqueue_video_processing(video_info, video_process_info, self.chat_id)
             
-            return video_info
+            # Create and store job info
+            job_info = VideoJobInfo(
+                file_id=file_id,
+                job_id=job_id,
+                video_info=video_info
+            )
+            self.video_jobs[file_id] = job_info
+            
+            return job_info
 
         except Exception as e:
             logger.error(f"Error processing upload: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-
-    async def _process_video(self, file_id: str, video_process_info:VideoProcessInfo) -> None:
-        """Process the video in a separate thread."""
-        if file_id not in self.video_jobs:
-            logger.error(f"Video job not found: {file_id}")
-            return
-            
-        video_info = self.video_jobs[file_id]
-        original_video_db_data = await self.original_video_repo.get_by_columns({"video_id": file_id})
-        original_video_db_data = original_video_db_data[0]
-        updated_info = await self.ffmpeg_service.trim_video(video_info,video_process_info)
-        self.video_jobs[file_id] = updated_info
-        
-        for segment in updated_info.segments:
-            trimmed_video = TrimmedVideo(
-                original_video_id=original_video_db_data.id,
-                start_time=timedelta(seconds=0),
-                end_time=timedelta(seconds=0),
-                remark="",
-                description="",
-                hashtags=[],
-                thumbnail=None,
-                file_name=segment,
-                location=os.path.join(config_properties.TRIMMED_DIR, segment)
-            )
-            await self.trimmed_video_repo.save(trimmed_video)
-
-            await self.telegram_messenger.send_text_message(
-                validators.generate_full_path_from_location(os.path.join(config_properties.TRIMMED_DIR, segment).replace("\\", "/"))
-            )
     
-    def get_video_status(self, file_id: str) -> VideoInfo:
+    def get_video_status(self, file_id: str) -> VideoJobInfo:
         """Get the status of a video processing job."""
         if file_id not in self.video_jobs:
             raise HTTPException(status_code=404, detail=f"Video job not found: {file_id}")
-        return self.video_jobs[file_id]
+        
+        job_info = self.video_jobs[file_id]
+        
+        # If job_id is a fallback ID (Redis wasn't available), skip queue status check
+        if job_info.job_id in ["no_queue_fallback", "exception_fallback"]:
+            job_info.video_info.status = ProcessingStatus.COMPLETED
+            return job_info
+            
+        # Get latest status from queue
+        job_status = get_job_status(job_info.job_id)
+        
+        # Update job status
+        if job_status['status'] == 'finished' and job_status['result']:
+            # Update VideoInfo with result
+            job_info.video_info = VideoInfo(**job_status['result'])
+        elif job_status['status'] == 'failed':
+            job_info.video_info.status = ProcessingStatus.FAILED
+            job_info.video_info.error = "Job failed in queue"
+        elif job_status['status'] == 'error':
+            # Handle error with Redis connection
+            job_info.video_info.status = ProcessingStatus.FAILED
+            job_info.video_info.error = job_status.get('message', 'Error with queue service')
+        elif job_status['status'] == 'fallback_completed':
+            job_info.video_info.status = ProcessingStatus.COMPLETED
+        
+        return job_info
     
-    def get_all_videos(self) -> List[VideoInfo]:
+    def get_all_videos(self) -> List[VideoJobInfo]:
         """Get all video jobs."""
         return list(self.video_jobs.values())
 

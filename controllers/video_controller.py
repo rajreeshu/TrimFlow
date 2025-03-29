@@ -5,7 +5,7 @@ from telegram import Update
 from controllers.video_controller_interface import UploadControllerInterface
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from models.file_type_model import FileData
-from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoJobInfo
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
 from telegram.ext import CallbackContext
@@ -27,20 +27,21 @@ class VideoController(UploadControllerInterface):
             video_process_info.skip_pairs = []
 
         """Handle video upload request."""
-        video_info = await self.video_service.upload_and_process(file, video_process_info)
+        job_info = await self.video_service.upload_and_process(file, video_process_info)
         
         return VideoUploadResponse(
-            filename=video_info.filename,
-            file_id=video_info.file_id,
+            filename=job_info.video_info.filename,
+            file_id=job_info.file_id,
+            job_id=job_info.job_id,
             status="Uploaded Successfully",
-            message="Video processing started"
+            message="Video processing added to queue"
         )
     
-    def get_video_status(self, file_id: str) -> VideoInfo:
+    def get_video_status(self, file_id: str) -> VideoJobInfo:
         """Get status of a video processing job."""
         return self.video_service.get_video_status(file_id)
     
-    def get_all_videos(self) -> List[VideoInfo]:
+    def get_all_videos(self) -> List[VideoJobInfo]:
         """Get all video jobs."""
         return self.video_service.get_all_videos()
 

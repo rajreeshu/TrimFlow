@@ -14,6 +14,11 @@ class Properties(BaseSettings):
     WIDTH_720P: int
     HEIGHT_720P: int
     TELEGRAM_BOT_TOKEN: str
+    REDIS_HOST : str
+    REDIS_PORT : int
+    REDIS_DB : int
+    REDIS_PASSWORD : str = ""  # Default to empty string if not provided
+    REDIS_QUEUE_NAME : str
 
     
     class Config:

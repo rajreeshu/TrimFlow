@@ -12,10 +12,12 @@ class ProcessingStatus(str, Enum):
     FAILED = "failed"
 
 class VideoUploadResponse(BaseModel):
+    """Response for video upload."""
     filename: str
     file_id: str
+    job_id: Optional[str] = None
     status: str
-    message: Optional[str] = None
+    message: str
 
 class VideoInfo(BaseModel):
     file_id: str
@@ -40,3 +42,9 @@ class VideoProcessInfo(BaseModel):
     edit_type: Optional[str] = None
     start_time: Optional[int] = None
     end_time: Optional[int] = None
+
+class VideoJobInfo(BaseModel):
+    """Information about a video processing job in the queue."""
+    file_id: str
+    job_id: str
+    video_info: VideoInfo

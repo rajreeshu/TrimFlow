@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class FfmpegService:
     # async def trim_video(self,video_info: VideoInfo,  skip_pairs: List[tuple], segment_time: int, start_time:int, end_time:int) -> VideoInfo:
-    async def trim_video(self,video_info: VideoInfo,  video_process_info:VideoProcessInfo) -> VideoInfo:
+    def trim_video(self, video_info: VideoInfo, video_process_info: VideoProcessInfo) -> VideoInfo:
         skip_pairs: List[tuple] = video_process_info.skip_pairs
         segment_time: int = video_process_info.segment_time
         start_time: int = video_process_info.start_time

@@ -10,6 +10,10 @@ from routers.url_router import UrlRouter
 from routers.video_router import VideoRouter
 from telegram.ext import Application as TelegramBotApplication
 from telegram_bot.handlers.video.handlers import TelegramBotHandlers
+import threading
+
+# Import for Redis connection check
+from services.queue_service import check_redis_connection
 
 class MainApp:
     def __init__(self):
@@ -44,7 +48,42 @@ class MainApp:
         async def startup():
             async with database_config.engine.begin() as conn:
                 await conn.run_sync(database_config.Base.metadata.create_all)
+            
+            # Check Redis connection
+            redis_connected = await check_redis_connection()
+            if not redis_connected:
+                logging.warning("Redis is not connected. Queue service will not be available. Processing will fall back to synchronous mode.")
+            else:
+                logging.info("Redis connection successful. Queue service is available.")
+                
+                # Start RQ Dashboard in a separate thread
+                self.start_rq_dashboard()
 
+    def start_rq_dashboard(self):
+        """Start the RQ Dashboard for monitoring jobs in a separate thread"""
+        try:
+            import rq_dashboard
+            from rq_dashboard import cli
+            
+            def run_dashboard():
+                import sys
+                sys.argv = [
+                    'rq-dashboard',
+                    '--redis-host', config_properties.REDIS_HOST,
+                    '--redis-port', str(config_properties.REDIS_PORT),
+                    '--redis-db', str(config_properties.REDIS_DB),
+                    '--port', '9181',  # Use a different port than the main app
+                    '--bind', '0.0.0.0'
+                ]
+                if config_properties.REDIS_PASSWORD:
+                    sys.argv.extend(['--redis-password', config_properties.REDIS_PASSWORD])
+                cli.main()
+            
+            # Start dashboard in a separate thread
+            threading.Thread(target=run_dashboard, daemon=True).start()
+            logging.info("RQ Dashboard started on port 9181")
+        except Exception as e:
+            logging.error(f"Error starting RQ Dashboard: {e}")
 
     async def run(self):
         config = uvicorn.Config("main:app", host=config_properties.BASE_URL, port=int(config_properties.PORT), reload=True)

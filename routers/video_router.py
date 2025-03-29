@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form
 from controllers.video_controller import VideoController
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.database_models import OriginalVideo
-from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoScreenType, VideoEditType
+from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo, VideoScreenType, VideoEditType, VideoJobInfo
 from services.ffmpeg_service import FfmpegService
 from services.video_service import VideoService
 import utils.validators as validators
@@ -53,15 +53,23 @@ class VideoRouter:
             """Upload a video file for processing."""
             return await controller.upload(video_process_info, file)
 
-        @self.router.get("/status/{file_id}", response_model=VideoInfo)
+        @self.router.get("/status/{file_id}", response_model=VideoJobInfo)
         def get_video_status(
             file_id: str,
             controller: VideoController = Depends(get_video_controller)
         ):
             """Get the status of a video processing job."""
             return controller.get_video_status(file_id)
+            
+        @self.router.get("/job/{job_id}")
+        def get_job_status(
+            job_id: str
+        ):
+            """Get the status of a job directly from the queue."""
+            from services.queue_service import get_job_status
+            return get_job_status(job_id)
 
-        @self.router.get("/", response_model=List[VideoInfo])
+        @self.router.get("/", response_model=List[VideoJobInfo])
         def get_all_videos(
             controller: VideoController = Depends(get_video_controller)
         ):

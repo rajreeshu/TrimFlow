@@ -8,3 +8,14 @@ srt==3.5.3
 uvicorn==0.34.0
 python-multipart
 asyncpg
+
+requests~=2.32.3
+pydantic-settings~=2.8.1
+starlette~=0.46.1
+tweepy~=4.15.0
+pytube~=15.0.0
+instaloader~=4.14.1
+yt-dlp~=2025.3.21
+python-telegram-bot~=20.3
+httpx~=0.24.1
+alembic

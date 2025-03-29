@@ -27,8 +27,8 @@ class TrimmedVideo(Base):
     start_time = Column(Interval, nullable=False)
     end_time = Column(Interval, nullable=False)
     remark = Column(Text, nullable=True)
-    created_time = Column(TIMESTAMP(timezone=True), server_default='CURRENT_TIMESTAMP')
-    updated_time = Column(TIMESTAMP(timezone=True), server_default='CURRENT_TIMESTAMP')
+    created_time = Column(TIMESTAMP(timezone=True), server_default=func.now())  # Corrected
+    updated_time = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())  # Corrected
     description = Column(Text, nullable=True)
     hashtags = Column(ARRAY(Text), nullable=True)
     thumbnail = Column(LargeBinary, nullable=True)

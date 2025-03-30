@@ -27,3 +27,4 @@ jobs:
         run: |
           pip install flake8
           flake8 --select=F401,F841,E999,F821,F632,E722,E402 --max-line-length=100 .
+        #  flake8 --select=F841,E999,F821,F632,E402 --max-line-length=100 .

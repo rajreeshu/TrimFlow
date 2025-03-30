@@ -6,6 +6,7 @@ from starlette.staticfiles import StaticFiles
 import uvicorn
 import database.database_config as database_config
 from config.config import config_properties
+from routers.test_router import TestRouter
 from routers.url_router import UrlRouter
 from routers.video_router import VideoRouter
 from telegram.ext import Application as TelegramBotApplication
@@ -35,8 +36,10 @@ class MainApp:
     def include_routers(self):
         video_router = VideoRouter()
         url_router = UrlRouter()
+        test_router = TestRouter()
         self.app.include_router(video_router.router)
         self.app.include_router(url_router.router)
+        self.app.include_router(test_router.router)
 
     # Initialize database
     def initialize_database(self):

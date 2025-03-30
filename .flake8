@@ -1,0 +1,7 @@
+[flake8]
+max-line-length = 120
+select = F401, F841, E999, F821, F632, E722, E402
+exclude = .git, __pycache__, old, build, dist
+
+
+

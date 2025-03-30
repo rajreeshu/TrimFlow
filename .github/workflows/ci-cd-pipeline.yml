@@ -22,27 +22,25 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      #only High-Priority Rules
+      # Only High-Priority Rules
       - name: Run Linter (Flake8)
         run: |
           pip install flake8
           flake8 --select=E999,F821,F632,E722 --max-line-length=100 .
-        #  flake8 --select=F841,E999,F821,F632,E402,F401,F841,E402 --max-line-length=100 .
-security-scan:
-  runs-on: ubuntu-latest
-  needs: lint-and-test
 
-  steps:
-    - name: Checkout Code
-      uses:
-        actions/checkout@v4
+  security-scan: # This must be inside `jobs:`
+    runs-on: ubuntu-latest
+    needs: lint-and-test
 
-        # Run Gitleaks for Secret Scanning
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Run Secret Scanning (Gitleaks)
-      uses: gitleaks/gitleaks-action@v2
+      # Run Gitleaks for Secret Scanning
+      - name: Run Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
 
-    - name: Run Secret Scanning (TruffleHog)
-      uses: trufflesecurity/trufflehog-action@v3
-      with:
-        args: --all --json
+      - name: Run Secret Scanning (TruffleHog)
+        uses: trufflesecurity/trufflehog-action@v3
+        with:
+          args: --all --json

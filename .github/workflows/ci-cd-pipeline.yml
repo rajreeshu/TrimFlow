@@ -40,3 +40,8 @@ jobs:
       # Run Gitleaks for Secret Scanning
       - name: Run Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
+
+      - name: Install and Run Detect-Secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --all-files > detect-secrets-report.json

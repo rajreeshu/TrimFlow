@@ -3,7 +3,7 @@ name: DevSecOps Pipeline
 on:
   push:
     branches:
-      - dev # Run the pipeline only for this branch
+      - master # Run the pipeline only for this branch
 
 jobs:
   lint-and-test:

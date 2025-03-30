@@ -40,8 +40,3 @@ jobs:
       # Run Gitleaks for Secret Scanning
       - name: Run Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
-
-      - name: Run Secret Scanning (TruffleHog)
-        uses: trufflesecurity/trufflehog-action@v3.88.20
-        with:
-          args: --all --json

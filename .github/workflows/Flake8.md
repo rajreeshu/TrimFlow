@@ -1,52 +1,57 @@
 # Flake8 Configuration Guide
 
-This guide explains how to configure Flake8 to ignore specific linting errors and warnings in your local environment and CI pipeline.
+Flake8 is a Python linting tool that enforces coding standards (PEP 8), checks for errors, and maintains code quality. It combines:
 
-Flake8 is a Python linting tool that helps enforce coding style (PEP 8), check for errors, and maintain code quality. It combines multiple tools into one:
+<li>
+<b>Pyflakes:</b> Detects logical errors and unused imports.
+<li>
+<b>pycodestyle:</b> Ensures PEP 8 compliance.
+<li>
+<b>McCabe:</b> Measures code complexity.
 
-Pyflakes – Checks for logical errors and unused imports.
+## 1. Configure .flake
 
-pycodestyle – Ensures compliance with PEP 8 (Python's style guide).
+Create a .flake8 file in your project root with the following content:
 
-McCabe – Calculates code complexity to detect overly complex cod
+```
+[flake8]
+ignore = E302, E203, W293, E501, F401
+max-line-length = 120
+```
 
+<br>
 
-1. Ignoring Specific Errors in .flake8
+<b>Ignored Errors:</b>
 
-Create a .flake8 file in your project root directory and add the following:
+<li> 302: Expected 2 blank lines, found 1.
+<li> E203: Whitespace before : (common with Black).
+<li> W293: Blank line contains whitespace.
+<li>E501: Line too long (default is 79, increased to 120).
+<li> F401: Imported but unused.
 
-`[flake8]
-ignore = E302,E203,W293,E501,F401
-max-line-length = 120`
+<br>
 
-Ignored Errors Explanation:
+## 2. Ignoring Errors Inline
 
-E302: Expected 2 blank lines, found 1
+Suppress specific errors for individual lines using `# noqa`:
 
-E203: Whitespace before : (common in Black-formatted code)
+```
+import os  # noqa: F401  # Ignore "imported but unused"
+```
 
-W293: Blank line contains whitespace
+## 3. Configure Flake8 in CI
 
-E501: Line too long (default is 79, increased to 120)
+Pass ignored errors and configurations via CLI in your CI pipeline:
 
-F401: Imported but unused
+```
+flake8 --ignore=E302,E203,W293,E501,F401 --max-line-length=120 .
+```
 
-2. Ignoring Specific Errors Inline
-
-You can ignore specific errors on certain lines using # noqa:
-
-`import os  # noqa: F401  # Ignore "imported but unused"`
-
-3. Ignoring Errors in CI Pipeline
-
-Modify your CI pipeline configuration to pass ignored errors via CLI:
-
-`flake8 --ignore=E302,E203,W293,E501,F401 --max-line-length=120 .`
-
-GitHub Actions Configuration
+`GitHub Actions` Configuration
 
 If using GitHub Actions, update your workflow file:
 
-`- name: Run Flake8
-  run: flake8 --ignore=E302,E203,W293,E501,F401 --max-line-length=120 .`
-
+```
+- name: Run Flake8
+  run: flake8 --ignore=E302,E203,W293,E501,F401 --max-line-length=120 .
+```

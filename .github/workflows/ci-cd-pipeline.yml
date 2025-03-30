@@ -18,24 +18,24 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+      #- name: Install FFmpeg
+       # run: |
+        #  sudo apt-get update
+         # sudo apt-get install -y ffmpeg
 
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
 
-     # - name: Run Linter (Flake8)
-        #run: |
-          #pip install flake8
-          #flake8 --max-line-length=100
+      - name: Run Linter (Flake8)
+        run: |
+          pip install flake8
+          flake8 --max-line-length=100
 
-      #- name: Run Unit Tests (pytest)
-        #run: |
-         # pip install pytest
-          #pytest tests/
+      - name: Run Unit Tests (pytest)
+        run: |
+          pip install pytest
+          pytest tests/
 
   security-scan:
     runs-on: ubuntu-latest

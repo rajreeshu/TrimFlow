@@ -1,45 +1,47 @@
 import asyncio
 import logging
 import sys
+
+import redis
 from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 import uvicorn
 import database.database_config as database_config
-from config.config import config_properties
-from routers.test_router import TestRouter
+from config.config import config_properties as properties
 from routers.url_router import UrlRouter
 from routers.video_router import VideoRouter
 from telegram.ext import Application as TelegramBotApplication
 from telegram_bot.handlers.video.handlers import TelegramBotHandlers
 
+
+# Configure logging
+def configure_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler("app.log")
+        ]
+    )
+
+
 class MainApp:
     def __init__(self):
-        # Create FastAPI app
+        configure_logging()
         self.app = FastAPI(title="Video Trimming Service")
-        self.configure_logging()
+        self.redis_client = redis.Redis(host=properties.BASE_URL, port=properties.REDIS_PORT, db=0)
+
         self.include_routers()
         self.initialize_database()
-        self.telegram_bot = TelegramBotApplication.builder().token(config_properties.TELEGRAM_BOT_TOKEN).build()
-
-    # Configure logging
-    def configure_logging(self):
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler(sys.stdout),
-                logging.FileHandler("app.log")
-            ]
-        )
+        self.telegram_bot = TelegramBotApplication.builder().token(properties.TELEGRAM_BOT_TOKEN).build()
 
     # Include routers
     def include_routers(self):
-        video_router = VideoRouter()
-        url_router = UrlRouter()
-        test_router = TestRouter()
+        video_router = VideoRouter(self.redis_client)
+        url_router = UrlRouter(self.redis_client)
         self.app.include_router(video_router.router)
         self.app.include_router(url_router.router)
-        self.app.include_router(test_router.router)
 
     # Initialize database
     def initialize_database(self):
@@ -50,7 +52,7 @@ class MainApp:
 
 
     async def run(self):
-        config = uvicorn.Config("main:app", host=config_properties.BASE_URL, port=int(config_properties.PORT), reload=True)
+        config = uvicorn.Config("main:app", host=properties.BASE_URL, port=int(properties.PORT), reload=True)
         server = uvicorn.Server(config)
         await server.serve()
 
@@ -73,9 +75,9 @@ class MainApp:
 # Create an instance of MainApp and expose the app attribute
 service = MainApp()
 app = service.app
-# Serve the trimmed videos directory
-app.mount("/media/trimmed_videos", StaticFiles(directory=config_properties.TRIMMED_DIR), name="trimmed_videos")
-app.mount("/media/uploaded_videos", StaticFiles(directory=config_properties.UPLOAD_DIR), name="uploaded_videos")
+
+# Set the static file directory for uploaded videos
+app.mount("/media/uploaded_videos", StaticFiles(directory=properties.UPLOAD_DIR), name="uploaded_videos")
 
 
 # Run the FastAPI server

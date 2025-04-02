@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from pydantic import BaseModel
 
+
 class OriginalVideoDTO(BaseModel):
     video_id: str
     name: str

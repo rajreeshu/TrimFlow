@@ -4,7 +4,6 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 import telegram_bot.handlers.video.video_handler_interface as video_handler_interface
-from controllers.url_controller import UrlController
 from telegram_bot.handlers.video.video_handler_interface import MessageHandlerInterface
 
 

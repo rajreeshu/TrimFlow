@@ -1,6 +1,9 @@
-from sqlalchemy import Column, Integer, String, BigInteger, Text, JSON, TIMESTAMP, Interval, ForeignKey, ARRAY, LargeBinary
+from sqlalchemy import Column, Integer, String, BigInteger, Text, JSON, TIMESTAMP, Interval, ForeignKey, ARRAY, \
+    LargeBinary
 from sqlalchemy.sql import func
+
 from database.database_config import Base
+
 
 class OriginalVideo(Base):
     __tablename__ = "original_video"
@@ -15,6 +18,7 @@ class OriginalVideo(Base):
     created_user: str = Column(String(255))
     description: str = Column(Text)
     category: str = Column(String(255))
+
     remark: str = Column(Text)
     addon: dict = Column(JSON)
 

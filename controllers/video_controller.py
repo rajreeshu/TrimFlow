@@ -1,48 +1,41 @@
-from typing import List, Optional
+from typing import List
 
+import redis
+from fastapi import HTTPException
 from telegram import Update
+from telegram.ext import CallbackContext
 
 from controllers.video_controller_interface import UploadControllerInterface
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from models.file_type_model import FileData
-from models.video_models import VideoUploadResponse, VideoInfo, VideoProcessInfo
-from services.ffmpeg_service import FfmpegService
+from models.video_models import VideoUploadResponse, VideoProcessInfo
+from services.redis_service import RedisService
 from services.video_service import VideoService
-from telegram.ext import CallbackContext
 
 
 class VideoController(UploadControllerInterface):
-    def __init__(self, update: Update, context: CallbackContext):
-        super().__init__(update, context)
-        self.video_service = VideoService(FfmpegService(), update, context)
+    def __init__(self, update: Update, context: CallbackContext, redis_client: redis.Redis ):
+        super().__init__(redis_client)
+        self.video_service = VideoService(update, context, redis_client)
+        self.redis_service = RedisService(redis_client)
     
     async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData) -> VideoUploadResponse:
+        if file_data.file is None:
+            raise HTTPException(status_code=400, detail="File must be provided")
         file = file_data.file
-        # Set default values if not provided
-        video_process_info.segment_time = video_process_info.segment_time or 55  # Default segment time
-        video_process_info.start_time = video_process_info.start_time or 0
-        video_process_info.end_time = video_process_info.end_time or 0
 
         if video_process_info.skip_pairs is None:
             video_process_info.skip_pairs = []
 
         """Handle video upload request."""
-        video_info = await self.video_service.upload_and_process(file, video_process_info)
+        return await self.video_service.upload_and_send_to_redis(file, video_process_info)
         
-        return VideoUploadResponse(
-            filename=video_info.filename,
-            file_id=video_info.file_id,
-            status="Uploaded Successfully",
-            message="Video processing started"
-        )
-    
-    def get_video_status(self, file_id: str) -> VideoInfo:
-        """Get status of a video processing job."""
-        return self.video_service.get_video_status(file_id)
-    
-    def get_all_videos(self) -> List[VideoInfo]:
-        """Get all video jobs."""
-        return self.video_service.get_all_videos()
+        # return VideoUploadResponse(
+        #     file_name=video_info.filename,
+        #     file_id=video_info.file_id,
+        #     status="Uploaded Successfully",
+        #     message="Video processing started"
+        # )
 
     async def get_all_original_videos(self) -> List[OriginalVideoDTO]:
         """Get all original videos."""

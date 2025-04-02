@@ -1,134 +1,50 @@
-from concurrent.futures import ThreadPoolExecutor
-import os
-from fastapi import UploadFile, HTTPException
 import logging
-import asyncio
-from datetime import timedelta
-from typing import Dict, List
+import os
+from typing import List
+
+import redis
+from fastapi import HTTPException, UploadFile
 from telegram import Update
 from telegram.ext import CallbackContext
 
+import utils.validators as validators
+import utils.video_utils as video_utils
+from config.config import config_properties
 from database.database_dto import OriginalVideoDTO, TrimmedVideoDTO
 from database.repository.original_video_repository import OriginalVideoRepository
 from database.repository.trimmed_video_repository import TrimmedVideoRepository
-from models.video_models import VideoInfo, ProcessingStatus, VideoProcessInfo
-import utils.file_utils as file_utils
-import utils.validators as validators
-from database.database_models import OriginalVideo, TrimmedVideo
-import services.subtitle_service as subtitle_service
-from services.ffmpeg_service import FfmpegService
-from config.config import config_properties
-import urllib.parse
-
-from telegram_bot.messenger import TelegramMessenger
+from models.video_models import VideoProcessInfo, VideoUploadResponse
+from services.redis_service import RedisService
 
 logger = logging.getLogger(__name__)
 
 class VideoService:
-    def __init__(self, ffmpeg_service: FfmpegService, update: Update, context: CallbackContext):
-        self.executor = ThreadPoolExecutor(max_workers=config_properties.MAX_WORKERS)
-        self.video_jobs: Dict[str, VideoInfo] = {}
-        self.ffmpeg_service = ffmpeg_service
+    def __init__(self, update: Update, context: CallbackContext, redis_client: redis.Redis):
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
-        self.telegram_messenger = TelegramMessenger(update, context)
+        self.redis_service = RedisService(redis_client)
 
-    async def upload_and_process(self, file: UploadFile, video_process_info: VideoProcessInfo) -> VideoInfo:
-        """Upload a video file and submit for processing."""
-        try:
-            # Validate file
-            validators.validate_video_file(file.filename)
-            
-            # Generate unique filename and ID
-            unique_filename, file_id = validators.generate_unique_filename(file.filename)
+    async def upload_and_send_to_redis(self, file : UploadFile, video_process_info : VideoProcessInfo) -> VideoUploadResponse:
+        # Validate file
+        validators.validate_video_file(file.filename)
 
-            # Save video file
-            file_path = os.path.join(config_properties.UPLOAD_DIR, unique_filename)
-            await file_utils.save_file_in_chunks(file, file_path)
+        # Generate unique filename and ID
+        unique_filename, file_id = validators.generate_unique_filename(file.filename)
 
-            # Save to database
-            original_video = OriginalVideo(
-                video_id=file_id,
-                name=unique_filename,
-                location=file_path,
-                size=os.path.getsize(file_path),
-                video_metadata={},  # Add any metadata if available
-                created_user="system",  # Replace with actual user if available
-                description="Uploaded video",
-                category="Uncategorized",
-                remark="",
-                addon={}
-            )
+        # Save video file
+        file_path = os.path.join(config_properties.UPLOAD_DIR, unique_filename)
+        await video_utils.save_file_in_chunks(file, file_path)
 
-            await self.original_video_repo.save(original_video)
-            if video_process_info.start_time is None:
-                video_process_info.start_time = subtitle_service.find_movie_start_time(file_path)
+        video_process_info.url= file_path
 
-            # Remove metadata from the video file
-            cleaned_file_path = self.ffmpeg_service.remove_metadata(file_path)
+        self.redis_service.upload_to_redis(video_process_info)
 
-            # Create video info object
-            video_info = VideoInfo(
-                file_id=file_id,
-                filename=unique_filename,
-                original_path=cleaned_file_path,
-                status=ProcessingStatus.PENDING
-            )
-
-            # Submit for processing
-            self.video_jobs[file_id] = video_info
-            asyncio.create_task(self._process_video(file_id,video_process_info))
-            
-            return video_info
-
-        except Exception as e:
-            logger.error(f"Error processing upload: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
-
-    async def _process_video(self, file_id: str, video_process_info:VideoProcessInfo) -> None:
-        """Process the video in a separate thread."""
-        if file_id not in self.video_jobs:
-            logger.error(f"Video job not found: {file_id}")
-            return
-            
-        video_info = self.video_jobs[file_id]
-        original_video_db_data = await self.original_video_repo.get_by_columns({"video_id": file_id})
-        original_video_db_data = original_video_db_data[0]
-        updated_info = await self.ffmpeg_service.trim_video(video_info,video_process_info)
-        self.video_jobs[file_id] = updated_info
-        
-        for segment in updated_info.segments:
-            trimmed_video = TrimmedVideo(
-                original_video_id=original_video_db_data.id,
-                start_time=timedelta(seconds=0),
-                end_time=timedelta(seconds=0),
-                remark="",
-                description="",
-                hashtags=[],
-                thumbnail=None,
-                file_name=segment,
-                location=os.path.join(config_properties.TRIMMED_DIR, segment)
-            )
-            await self.trimmed_video_repo.save(trimmed_video)
-
-            await self.telegram_messenger.send_text_message(
-                validators.generate_full_path_from_location(os.path.join(config_properties.TRIMMED_DIR, segment).replace("\\", "/"))
-            )
-    
-    def get_video_status(self, file_id: str) -> VideoInfo:
-        """Get the status of a video processing job."""
-        if file_id not in self.video_jobs:
-            raise HTTPException(status_code=404, detail=f"Video job not found: {file_id}")
-        return self.video_jobs[file_id]
-    
-    def get_all_videos(self) -> List[VideoInfo]:
-        """Get all video jobs."""
-        return list(self.video_jobs.values())
-
-    def shutdown(self):
-        """Shutdown the executor properly."""
-        self.executor.shutdown(wait=True)
+        return VideoUploadResponse(
+            file=unique_filename,
+            file_id=file_id,
+            status="Uploaded Successfully",
+            message="Video processing started"
+        )
 
     async def get_all_original_videos(self) -> List[OriginalVideoDTO]:
         """Retrieve all records from the OriginalVideo table."""
@@ -150,3 +66,4 @@ class VideoService:
         except Exception as e:
             logger.error(f"Error retrieving trimmed videos for original file ID {file_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve trimmed videos: {str(e)}")
+

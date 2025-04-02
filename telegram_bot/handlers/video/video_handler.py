@@ -4,8 +4,8 @@ import os
 from fastapi import UploadFile
 from telegram import Update
 from telegram.ext import CallbackContext
+
 import telegram_bot.handlers.video.video_handler_interface as video_handler_interface
-from controllers.video_controller import VideoController
 from telegram_bot.handlers.video.video_handler_interface import MessageHandlerInterface
 
 

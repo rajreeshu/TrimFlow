@@ -1,5 +1,7 @@
 import os
+
 from pydantic_settings import BaseSettings
+
 
 class Properties(BaseSettings):
     UPLOAD_DIR: str
@@ -14,6 +16,7 @@ class Properties(BaseSettings):
     WIDTH_720P: int
     HEIGHT_720P: int
     TELEGRAM_BOT_TOKEN: str
+    REDIS_PORT: int
 
     
     class Config:

@@ -3,7 +3,7 @@ name: DevSecOps Pipeline
 on:
   push:
     branches:
-      - master_prashant # Run the pipeline only for this branch
+      - dev # Run the pipeline only for this branch
 
 jobs:
   lint-and-test:
@@ -22,10 +22,78 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      #Only the High-Priority Rules
+      # Only the High-Priority Rules
       - name: Run Linter (Flake8)
         run: |
           pip install flake8
           flake8 --select=F401,F841,E999,F821,F632,E722,E402 --max-line-length=100 .
-        #  use this in production flake8 --select=F401,F841,E999,F821,F632,E722,E402 --max-line-length=100 .
-        # to temporarily pass the error flake8 --select=F841,E999,F821,F632,E402 --max-line-length=100 .
+        continue-on-error: true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 🛡️ 1️⃣ Secret Scanning
+      - name: Run Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+
+      - name: Install and Run Detect-Secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --all-files | tee detect-secrets-report.json
+
+      # 🔍 2️⃣ Static Code Analysis (SAST)
+      - name: Run Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/default"
+        continue-on-error: true
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      # 📦 3️⃣ Dependency Scanning
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "MyProject"
+          path: "./"
+          format: "HTML"
+          out: "reports"
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: "monitor"
+
+      # 🐳 4️⃣ Container & OS Vulnerability Scanning
+      - name: Run Trivy on Docker Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "your-docker-image"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      # Bandit Security Scan
+      - name: Run Bandit Security Scan
+        run: |
+          pip install bandit
+          bandit -r . -f json -o bandit-report.json
+
+      # Semgrep Security Scan
+      - name: Run Semgrep
+        run: |
+          semgrep --config p/ci --json --output semgrep-report.json

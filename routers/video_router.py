@@ -16,10 +16,10 @@ def get_video_controller():
 
 
 class VideoRouter:
-    def __init__(self, redis_client: redis.Redis ):
+    def __init__(self):
         self.router = APIRouter(prefix="/videos", tags=["videos"])
         self.add_routes()
-        self.video_controller = VideoController(None, None, redis_client)
+        self.video_controller = VideoController(None, None)
 
     def add_routes(self):
         @self.router.post("/upload/", response_model=VideoUploadResponse)

@@ -2,6 +2,8 @@
 
 # redis constants
 REDIS_VIDEO_QUEUE_NAME : str = "video_processing_queue"
+REDIS_VIDEO_PROCESSING_COMPLETED_QUEUE_NAME : str= "video_processing_completed"
+
 
 # Common Terms
 LANDSCAPE :str = "landscape"

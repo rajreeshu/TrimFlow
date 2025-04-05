@@ -14,10 +14,9 @@ from services.video_service import VideoService
 
 
 class VideoController(UploadControllerInterface):
-    def __init__(self, update: Update, context: CallbackContext, redis_client: redis.Redis ):
-        super().__init__(redis_client)
-        self.video_service = VideoService(update, context, redis_client)
-        self.redis_service = RedisService(redis_client)
+    def __init__(self, update: Update, context: CallbackContext):
+        self.video_service = VideoService(update, context)
+        self.redis_service = RedisService()
     
     async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData) -> VideoUploadResponse:
         if file_data.file is None:

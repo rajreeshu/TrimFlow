@@ -19,10 +19,10 @@ from services.redis_service import RedisService
 logger = logging.getLogger(__name__)
 
 class VideoService:
-    def __init__(self, update: Update, context: CallbackContext, redis_client: redis.Redis):
+    def __init__(self, update: Update, context: CallbackContext):
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
-        self.redis_service = RedisService(redis_client)
+        self.redis_service = RedisService()
 
     async def upload_and_send_to_redis(self, file : UploadFile, video_process_info : VideoProcessInfo) -> VideoUploadResponse:
         # Validate file
@@ -35,7 +35,7 @@ class VideoService:
         file_path = os.path.join(config_properties.UPLOAD_DIR, unique_filename)
         await video_utils.save_file_in_chunks(file, file_path)
 
-        video_process_info.url= file_path
+        video_process_info.url= validators.generate_full_path_from_location(file_path)
 
         self.redis_service.upload_to_redis(video_process_info)
 

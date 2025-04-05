@@ -7,10 +7,14 @@ from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 import uvicorn
 import database.database_config as database_config
+from config import constants
 from config.config import config_properties as properties
+from redis_queue.redis_client import RedisManager
 from routers.url_router import UrlRouter
 from routers.video_router import VideoRouter
 from telegram.ext import Application as TelegramBotApplication
+
+from services.redis_service import RedisService
 from telegram_bot.handlers.video.handlers import TelegramBotHandlers
 
 
@@ -30,28 +34,25 @@ class MainApp:
     def __init__(self):
         configure_logging()
         self.app = FastAPI(title="Video Trimming Service")
-        self.redis_client = redis.Redis(host=properties.BASE_URL, port=properties.REDIS_PORT, db=0)
-
         self.include_routers()
         self.initialize_database()
         self.telegram_bot = TelegramBotApplication.builder().token(properties.TELEGRAM_BOT_TOKEN).build()
+        self.redis_service = RedisService()
 
     # Include routers
     def include_routers(self):
-        video_router = VideoRouter(self.redis_client)
-        url_router = UrlRouter(self.redis_client)
+        video_router = VideoRouter()
+        url_router = UrlRouter()
         self.app.include_router(video_router.router)
         self.app.include_router(url_router.router)
 
     # Initialize database
     def initialize_database(self):
         @self.app.on_event("startup")
-        async def startup():
-            async with database_config.engine.begin() as conn:
-                await conn.run_sync(database_config.Base.metadata.create_all)
+        def startup():
+            database_config.Base.metadata.create_all(bind=database_config.engine)
 
-
-    async def run(self):
+    async def run_fast_api(self):
         config = uvicorn.Config("main:app", host=properties.BASE_URL, port=int(properties.PORT), reload=True)
         server = uvicorn.Server(config)
         await server.serve()
@@ -65,10 +66,31 @@ class MainApp:
         await self.telegram_bot.updater.start_polling()
         logging.info("Telegram handlers started...")
 
+    async def run_redis(self):
+        redis_client = RedisManager.get_client()
+        try:
+            while True:
+                # Wait for a job from the queue with a timeout of 1 second
+                job = redis_client.brpop([constants.REDIS_VIDEO_PROCESSING_COMPLETED_QUEUE_NAME], timeout=properties.QUEUE_TIMEOUT)
+                if job:
+                    # job is a tuple (queue_name, item)
+                    job_id = job[1]
+                    self.redis_service.get_processed_video_and_upload(job_id)
+                else:
+                    # No job available, just print a dot to show we're alive
+                    print(".", end="", flush=True)
+                    await asyncio.sleep(0.1)
+        except KeyboardInterrupt:
+            logging.info("Shutting down job consumer...")
+        except Exception as e:
+            logging.info(f"Error: {e}")
+
     async def main(self):
+
         await asyncio.gather(
-            self.run(),
-            self.run_telegram_bot()
+            self.run_fast_api(),
+            self.run_telegram_bot(),
+            self.run_redis()
         )
 
 
@@ -83,4 +105,3 @@ app.mount("/media/uploaded_videos", StaticFiles(directory=properties.UPLOAD_DIR)
 # Run the FastAPI server
 if __name__ == "__main__":
     asyncio.run(service.main())
-

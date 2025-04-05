@@ -11,11 +11,10 @@ from utils import validators
 
 class UrlRouter:
 
-    def __init__(self, redis_client: redis.Redis):
+    def __init__(self):
         self.router = APIRouter(prefix="/url", tags=["url"])
         self.add_routes()
-        self.redis_client = redis_client
-        self.url_controller = UrlController(redis_client)
+        self.url_controller = UrlController()
 
     def add_routes(self):
         @self.router.post("/upload/", response_model=VideoUploadResponse)

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import Column, Integer, String, BigInteger, Text, JSON, TIMESTAMP, Interval, ForeignKey, ARRAY, \
     LargeBinary
 from sqlalchemy.sql import func
@@ -9,10 +11,10 @@ class OriginalVideo(Base):
     __tablename__ = "original_video"
 
     id: int = Column(Integer, primary_key=True, index=True)
-    video_id: str = Column(String(255), unique=True, nullable=False)
+    video_id: Optional[str] = Column(String(255), unique=True, nullable=False)
     name: str = Column(String(255))
     location: str = Column(Text)
-    size: int = Column(BigInteger)
+    size: Optional[int] = Column(BigInteger)
     video_metadata: dict = Column(JSON)
     created_date: str = Column(TIMESTAMP(timezone=True), default=func.now())
     created_user: str = Column(String(255))

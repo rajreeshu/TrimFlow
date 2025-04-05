@@ -40,7 +40,8 @@ class MediaType(str, Enum):
 
 class VideoProcessInfo(BaseModel):
     media_type: MediaType
-    url: Optional[str] = None
+    url: Optional[str]=None
+    file_name : Optional[str] = None
     segment_time: int = constants.DEFAULT_VIDEO_SEGMENT_TIME
     start_time: int = constants.DEFAULT_START_TIME
     end_time: int = constants.DEFAULT_END_TIME

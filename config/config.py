@@ -17,6 +17,7 @@ class Properties(BaseSettings):
     HEIGHT_720P: int
     TELEGRAM_BOT_TOKEN: str
     REDIS_PORT: int
+    QUEUE_TIMEOUT: int
 
     
     class Config:

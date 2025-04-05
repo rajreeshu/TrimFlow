@@ -8,9 +8,8 @@ from services.redis_service import RedisService
 
 
 class UrlController(UploadControllerInterface):
-    def __init__(self, redis_client: redis.Redis):
-        super().__init__(redis_client)
-        self.redis_service = RedisService(redis_client)
+    def __init__(self):
+        self.redis_service = RedisService()
 
 
     def upload(self, video_process_info: VideoProcessInfo, file_data: FileData):

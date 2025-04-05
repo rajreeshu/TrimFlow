@@ -16,6 +16,7 @@ from telegram.ext import Application as TelegramBotApplication
 
 from services.redis_service import RedisService
 from telegram_bot.handlers.video.handlers import TelegramBotHandlers
+from telegram_bot.telegram_client import TelegramManager
 
 
 # Configure logging
@@ -36,7 +37,7 @@ class MainApp:
         self.app = FastAPI(title="Video Trimming Service")
         self.include_routers()
         self.initialize_database()
-        self.telegram_bot = TelegramBotApplication.builder().token(properties.TELEGRAM_BOT_TOKEN).build()
+        self.telegram_bot = TelegramManager.get_client()
         self.redis_service = RedisService()
 
     # Include routers

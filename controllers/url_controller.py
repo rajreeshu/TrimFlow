@@ -12,11 +12,11 @@ class UrlController(UploadControllerInterface):
         self.redis_service = RedisService()
 
 
-    def upload(self, video_process_info: VideoProcessInfo, file_data: FileData):
+    def upload(self, video_process_info: VideoProcessInfo, file_data: FileData, telegram_chat_id: int):
         if not file_data or not video_process_info:
             raise HTTPException(status_code=400, detail="Missing required Fields")
         video_process_info.url= file_data.url
         # Upload to Redis
-        return self.redis_service.upload_to_redis(video_process_info)
+        return self.redis_service.upload_to_redis(video_process_info, telegram_chat_id)
 
 

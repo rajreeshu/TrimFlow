@@ -271,9 +271,10 @@ async def send_video_update(answers: Dict[QuestionType, Any], update: Update, co
         f"Processing Started !\nAnswers:\n{readable_answers}"
     )
     # Trigger the upload process
-    await ControllerFactory(update, context).get_upload_controller(file_data).upload(
+    await ControllerFactory().get_upload_controller(file_data).upload(
         video_process,
-        file_data
+        file_data,
+        update.effective_chat.id
     )
 
 class MessageHandlerInterface(ABC):

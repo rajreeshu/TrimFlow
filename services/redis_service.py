@@ -8,6 +8,7 @@ from database.repository.trimmed_video_repository import TrimmedVideoRepository
 from models.redis_model import TransferDocument, ProcessedDataReceiver
 from models.video_models import VideoProcessInfo, VideoUploadResponse, ProcessingStatus
 from redis_queue.redis_client import RedisManager
+from telegram_bot.messenger import TelegramMessenger
 
 
 class RedisService:
@@ -15,8 +16,9 @@ class RedisService:
         self.redis_client = RedisManager.get_client()
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
+        self.telegram_messenger = TelegramMessenger(None, None)
 
-    def upload_to_redis(self, video_process_info: VideoProcessInfo):
+    def upload_to_redis(self, video_process_info: VideoProcessInfo, telegram_chat_id : int):
         if video_process_info and video_process_info.url:
             job_id = str(uuid.uuid4())
             # Save to database
@@ -35,6 +37,7 @@ class RedisService:
             saved_data, video_id = self.original_video_repo.save(original_video)
             transfer_doc = TransferDocument.from_video_process_info(video_process_info, video_id)
             transfer_doc.original_video_id= video_id
+            transfer_doc.telegram_chat_id = telegram_chat_id
 
 
             # Convert TransferDocument to dictionary before JSON serialization
@@ -60,6 +63,8 @@ class RedisService:
                 location = processed_data.location
             )
             self.trimmed_video_repo.save(db_entity)
+            if processed_data.telegram_chat_id:
+                self.telegram_messenger.send_message_with_chat_id(int(processed_data.telegram_chat_id), processed_data.location)
             return video_data
         else:
             return None

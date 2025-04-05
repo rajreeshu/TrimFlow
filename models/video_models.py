@@ -39,7 +39,7 @@ class MediaType(str, Enum):
     IMAGE = constants.IMAGE
 
 class VideoProcessInfo(BaseModel):
-    media_type: MediaType
+    media_type: Optional[MediaType] = MediaType.VIDEO
     url: Optional[str]=None
     file_name : Optional[str] = None
     segment_time: int = constants.DEFAULT_VIDEO_SEGMENT_TIME
@@ -48,3 +48,4 @@ class VideoProcessInfo(BaseModel):
     skip_pairs: List[Tuple[int, int]] = []
     screen_type: VideoScreenType = VideoScreenType.LANDSCAPE
     edit_type: Optional[str] = None  # To be done
+

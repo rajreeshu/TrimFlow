@@ -45,5 +45,5 @@ class UrlRouter:
 
             file_type: FileData = FileData(url=url)
 
-            return self.url_controller.upload(video_process_info, file_type)
+            return self.url_controller.upload(video_process_info, file_type, None)
 

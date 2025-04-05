@@ -17,6 +17,7 @@ class TransferDocument(BaseModel):
     screen_type: Optional[VideoScreenType] = None
     edit_type: Optional[str] = None
     original_video_id: Optional[str] = None
+    telegram_chat_id : Optional[int] = None
 
     @classmethod
     def from_video_process_info(cls, video_process_info: 'VideoProcessInfo',
@@ -36,3 +37,4 @@ class ProcessedDataReceiver(BaseModel):
     original_video_id: Optional[int] = None
     file_name : Optional[str] = None
     location: Optional[str] = None
+    telegram_chat_id: Optional[int|str] = None

@@ -19,12 +19,12 @@ from services.redis_service import RedisService
 logger = logging.getLogger(__name__)
 
 class VideoService:
-    def __init__(self, update: Update, context: CallbackContext):
+    def __init__(self):
         self.original_video_repo = OriginalVideoRepository()
         self.trimmed_video_repo = TrimmedVideoRepository()
         self.redis_service = RedisService()
 
-    async def upload_and_send_to_redis(self, file : UploadFile, video_process_info : VideoProcessInfo) -> VideoUploadResponse:
+    async def upload_and_send_to_redis(self, file : UploadFile, video_process_info : VideoProcessInfo, telegram_chat_id : int) -> VideoUploadResponse:
         # Validate file
         validators.validate_video_file(file.filename)
 

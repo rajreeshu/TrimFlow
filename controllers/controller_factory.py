@@ -8,16 +8,12 @@ from models.file_type_model import FileData
 
 
 class ControllerFactory:
-    def __init__(self, update: Update, context: CallbackContext):
-        self.update = update
-        self.context = context
-
     def get_upload_controller(self, file_data :FileData) -> UploadControllerInterface:
         if file_data.url is not None:
             # If the file_data contains a URL, return a UrlController
-            return UrlController(self.update, self.context)
+            return UrlController()
         elif file_data.file is not None:
             # If the file_data contains a file, return a VideoController
-            return VideoController(self.update, self.context)
+            return VideoController()
 
         raise ValueError("No valid file data provided")

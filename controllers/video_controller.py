@@ -14,11 +14,11 @@ from services.video_service import VideoService
 
 
 class VideoController(UploadControllerInterface):
-    def __init__(self, update: Update, context: CallbackContext):
-        self.video_service = VideoService(update, context)
+    def __init__(self):
+        self.video_service = VideoService()
         self.redis_service = RedisService()
     
-    async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData) -> VideoUploadResponse:
+    async def upload(self, video_process_info: VideoProcessInfo, file_data: FileData, telegram_chat_id: int) -> VideoUploadResponse:
         if file_data.file is None:
             raise HTTPException(status_code=400, detail="File must be provided")
         file = file_data.file
